@@ -1,0 +1,28 @@
+{
+  "name": "@churnify/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@churnify/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@churnify/config": "workspace:*",
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3"
+  }
+}

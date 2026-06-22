@@ -1,0 +1,81 @@
+# Faz 9 — Üretim benzeri tam yığın (api + web + postgres + redis).
+# Kullanım: docker compose -f docker-compose.prod.yml up -d --build
+# Gizli değerleri .env.prod ile geçirin (TOKEN_ENCRYPTION_KEY, JWT secret'lar, CREEM_*, vb.).
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: churnify
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-churnify}
+      POSTGRES_DB: churnify
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U churnify -d churnify"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Migration'ları uygular, sonra çıkar (api buna bağlı).
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["node", "dist/database/migrate.js"]
+    environment:
+      DATABASE_URL: postgresql://churnify:${POSTGRES_PASSWORD:-churnify}@postgres:5432/churnify
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://churnify:${POSTGRES_PASSWORD:-churnify}@postgres:5432/churnify
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:3000}
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:

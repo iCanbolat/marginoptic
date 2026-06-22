@@ -1,0 +1,22 @@
+{
+  "extends": "@churnify/config/tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "isolatedModules": true,
+    "target": "ES2022",
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "declaration": true,
+    "removeComments": true,
+    "sourceMap": true,
+    "incremental": true,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "skipLibCheck": true
+  },
+  "include": ["src", "test"]
+}
