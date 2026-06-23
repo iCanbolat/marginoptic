@@ -1,16 +1,5 @@
-import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { storesApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/store";
 import { useStoreSelection } from "@/lib/stores/selection";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tabs,
@@ -18,23 +7,21 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { CogsTab } from "./cogs-tab";
-import { ShippingTab } from "./shipping-tab";
-import { FeesTaxTab } from "./fees-tax-tab";
-import { ExpensesTab } from "./expenses-tab";
+import { useStores } from "./hooks/use-stores";
+import { CostsEmptyState } from "./components/costs-empty-state";
+import { CogsTab } from "./components/cogs-tab";
+import { ShippingTab } from "./components/shipping-tab";
+import { FeesTaxTab } from "./components/fees-tax-tab";
+import { ExpensesTab } from "./components/expenses-tab";
 
 export function CostsPage() {
   const role = useAuthStore((s) => s.activeOrg?.role);
   const canEdit = role === "owner" || role === "admin" || role === "analyst";
 
   const activeStoreId = useStoreSelection((s) => s.activeStoreId);
-  const { data: stores = [], isLoading } = useQuery({
-    queryKey: ["stores"],
-    queryFn: storesApi.list,
-  });
+  const { data: stores = [], isLoading } = useStores();
   const storeId = activeStoreId ?? stores[0]?.id ?? null;
-  const storeName =
-    stores.find((s) => s.id === storeId)?.name ?? null;
+  const storeName = stores.find((s) => s.id === storeId)?.name ?? null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -49,20 +36,7 @@ export function CostsPage() {
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
       ) : stores.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Mağaza yok</CardTitle>
-            <CardDescription>
-              Maliyet kuralları mağazaya bağlıdır. Önce bir Shopify mağazası
-              bağlayın.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link to="/integrations">Entegrasyonlar</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <CostsEmptyState />
       ) : (
         <Tabs defaultValue="cogs">
           <div className="flex flex-wrap items-center justify-between gap-2">

@@ -1,4 +1,4 @@
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/errors";
 
 /** ApiError mesajını (varsa zod issue'larıyla) okunur tek satıra çevirir. */
 export function errMsg(e: unknown, fallback: string): string {

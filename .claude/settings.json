@@ -121,7 +121,15 @@
       "Bash(npm run *)",
       "Bash(npx --yes shadcn@latest add calendar --yes --overwrite)",
       "Bash(awk '/export function formatDate/,/^}/' lib/format.ts)",
-      "Bash(tee /tmp/tsc2.out)"
+      "Bash(tee /tmp/tsc2.out)",
+      "Bash(awk '/export const costsApi = \\\\{/,/^\\\\};/' lib/api.ts)",
+      "Bash(awk '/export const expensesApi = \\\\{/,/^\\\\};/' lib/api.ts)",
+      "Bash(tee /tmp/tsc3.out)",
+      "Bash(awk '/export const orgApi = \\\\{/,/^\\\\};/' lib/api.ts)",
+      "Bash(tee /tmp/tsc4.out)",
+      "Bash(cd /Users/fatihcan/Desktop/churnify/apps/web && grep -iE \"react-hook-form|@hookform/resolvers|\\\\\"zod\\\\\"\" package.json; echo \"--- invite schema ---\"; sed -n '38,46p' ../../packages/shared/src/auth.ts)",
+      "Read(//Users/fatihcan/packages/shared/src/**)",
+      "Bash(tee /tmp/tsc5.out)"
     ],
     "additionalDirectories": [
       "/tmp",
