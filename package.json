@@ -15,6 +15,7 @@
     "db:generate": "pnpm --filter @churnify/api db:generate",
     "db:migrate": "pnpm --filter @churnify/api db:migrate",
     "db:studio": "pnpm --filter @churnify/api db:studio",
+    "seed:dev": "pnpm --filter @churnify/api seed:dev",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },

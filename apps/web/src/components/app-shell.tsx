@@ -1,9 +1,25 @@
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  DashboardSquare01Icon,
+  ShoppingBag01Icon,
+  Coins01Icon,
+  Megaphone01Icon,
+  PlugSocketIcon,
+  UserMultiple02Icon,
+  Key01Icon,
+  CreditCardIcon,
+  SidebarLeft01Icon,
+  Menu01Icon,
+  Logout02Icon,
+} from "@hugeicons/core-free-icons";
+import type { IconSvgElement } from "@hugeicons/react";
 import { authApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/store";
+import { useSidebar } from "@/lib/stores/sidebar";
+import { cn } from "@/lib/utils";
 import { OrgSwitcher } from "./org-switcher";
-import { StoreSelector } from "./store-selector";
 import { DataFreshnessBadge } from "./data-freshness-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -15,17 +31,42 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-const NAV = [
-  { to: "/", label: "Genel Bakış", exact: true },
-  { to: "/orders", label: "Siparişler", exact: false },
-  { to: "/costs", label: "Maliyetler", exact: false },
-  { to: "/ads", label: "Reklamlar", exact: false },
-  { to: "/integrations", label: "Entegrasyonlar", exact: false },
-  { to: "/settings/members", label: "Üyeler", exact: false },
-  { to: "/settings/api-keys", label: "API Anahtarları", exact: false },
-  { to: "/billing", label: "Faturalandırma", exact: false },
-] as const;
+interface NavItem {
+  to: string;
+  label: string;
+  icon: IconSvgElement;
+  exact?: boolean;
+}
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Genel",
+    items: [
+      { to: "/", label: "Genel Bakış", icon: DashboardSquare01Icon, exact: true },
+      { to: "/orders", label: "Siparişler", icon: ShoppingBag01Icon },
+      { to: "/costs", label: "Maliyetler", icon: Coins01Icon },
+      { to: "/ads", label: "Reklamlar", icon: Megaphone01Icon },
+    ],
+  },
+  {
+    label: "Yönetim",
+    items: [
+      { to: "/integrations", label: "Entegrasyonlar", icon: PlugSocketIcon },
+      { to: "/settings/members", label: "Üyeler", icon: UserMultiple02Icon },
+      { to: "/settings/api-keys", label: "API Anahtarları", icon: Key01Icon },
+      { to: "/billing", label: "Faturalandırma", icon: CreditCardIcon },
+    ],
+  },
+];
+
+const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
 function initials(name: string | undefined): string {
   if (!name) return "?";
@@ -37,26 +78,42 @@ function initials(name: string | undefined): string {
     .toUpperCase();
 }
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLink({
+  item,
+  collapsed,
+  onNavigate,
+}: {
+  item: NavItem;
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
+  const link = (
+    <Link
+      to={item.to}
+      activeOptions={{ exact: item.exact ?? false }}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-3 py-2 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        collapsed && "justify-center px-0",
+      )}
+      activeProps={{
+        "aria-current": "page",
+        className:
+          "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
+      }}
+    >
+      <HugeiconsIcon icon={item.icon} className="size-5 shrink-0" />
+      {!collapsed && <span className="truncate">{item.label}</span>}
+    </Link>
+  );
+
+  // Daraltılmış modda etiketi shadcn Tooltip ile göster.
+  if (!collapsed) return link;
   return (
-    <>
-      {NAV.map((item) => (
-        <Link
-          key={item.to}
-          to={item.to}
-          activeOptions={{ exact: item.exact }}
-          onClick={onNavigate}
-          className="rounded-md px-3 py-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          activeProps={{
-            "aria-current": "page",
-            className:
-              "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
-          }}
-        >
-          {item.label}
-        </Link>
-      ))}
-    </>
+    <Tooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="right">{item.label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -71,26 +128,14 @@ function MobileNav() {
           className="md:hidden"
           aria-label="Menüyü aç"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            className="size-5"
-            aria-hidden="true"
-          >
-            <line x1="4" y1="6" x2="20" y2="6" />
-            <line x1="4" y1="12" x2="20" y2="12" />
-            <line x1="4" y1="18" x2="20" y2="18" />
-          </svg>
+          <HugeiconsIcon icon={Menu01Icon} className="size-5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
-        {NAV.map((item) => (
+        {ALL_ITEMS.map((item) => (
           <DropdownMenuItem key={item.to} asChild>
-            <Link to={item.to} activeOptions={{ exact: item.exact }}>
+            <Link to={item.to} activeOptions={{ exact: item.exact ?? false }}>
+              <HugeiconsIcon icon={item.icon} className="size-4" />
               {item.label}
             </Link>
           </DropdownMenuItem>
@@ -104,6 +149,8 @@ export function AppShell() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const setOrganizations = useAuthStore((s) => s.setOrganizations);
+  const collapsed = useSidebar((s) => s.collapsed);
+  const toggleSidebar = useSidebar((s) => s.toggle);
 
   // Organizasyon listesini + kullanıcıyı tazele (switcher bunu kullanır).
   useQuery({
@@ -121,7 +168,8 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <TooltipProvider delayDuration={150}>
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Erişilebilirlik: içeriğe atla bağlantısı (klavye odağında görünür). */}
       <a
         href="#main-content"
@@ -130,21 +178,66 @@ export function AppShell() {
         İçeriğe geç
       </a>
 
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-3 md:flex">
-        <div className="mb-6 px-2 pt-2 text-lg font-semibold tracking-tight">
-          Churnify
+      <aside
+        className={cn(
+          "hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-3 transition-[width] duration-200 md:flex",
+          collapsed ? "w-16" : "w-60",
+        )}
+      >
+        <div
+          className={cn(
+            "mb-4 flex items-center gap-2 px-2 pt-2",
+            collapsed && "justify-center px-0",
+          )}
+        >
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+            C
+          </div>
+          {!collapsed && (
+            <span className="text-lg font-semibold tracking-tight">
+              Churnify
+            </span>
+          )}
         </div>
-        <nav aria-label="Ana gezinme" className="flex flex-col gap-1 text-sm">
-          <NavLinks />
+
+        <nav aria-label="Ana gezinme" className="flex flex-1 flex-col gap-4 text-sm">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className="flex flex-col gap-1">
+              {!collapsed && (
+                <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/40">
+                  {group.label}
+                </div>
+              )}
+              {group.items.map((item) => (
+                <NavLink key={item.to} item={item} collapsed={collapsed} />
+              ))}
+            </div>
+          ))}
         </nav>
+
+        <Button
+          variant="ghost"
+          size={collapsed ? "icon" : "sm"}
+          onClick={toggleSidebar}
+          aria-label={collapsed ? "Kenar çubuğunu genişlet" : "Kenar çubuğunu daralt"}
+          className={cn(
+            "mt-2 text-sidebar-foreground/60",
+            collapsed ? "self-center" : "justify-start gap-2",
+          )}
+        >
+          <HugeiconsIcon
+            icon={SidebarLeft01Icon}
+            className={cn("size-5 transition-transform", collapsed && "rotate-180")}
+          />
+          {!collapsed && <span>Daralt</span>}
+        </Button>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between gap-2 border-b border-border px-4">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
           <div className="flex min-w-0 items-center gap-2">
             <MobileNav />
             <OrgSwitcher />
-            <StoreSelector />
             <DataFreshnessBadge />
           </div>
           <DropdownMenu>
@@ -169,16 +262,18 @@ export function AppShell() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => void handleLogout()}>
+                <HugeiconsIcon icon={Logout02Icon} className="size-4" />
                 Çıkış yap
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
 
-        <main id="main-content" className="flex-1 p-4 sm:p-6">
+        <main id="main-content" className="flex-1 overflow-y-auto p-4 sm:p-6">
           <Outlet />
         </main>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

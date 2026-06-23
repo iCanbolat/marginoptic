@@ -15,7 +15,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function OrgSwitcher() {
+/** Org adından baş harf (daraltılmış sidebar rozeti için). */
+function orgInitial(name: string | undefined): string {
+  return name?.trim()?.[0]?.toUpperCase() ?? "?";
+}
+
+export function OrgSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const qc = useQueryClient();
   const activeOrg = useAuthStore((s) => s.activeOrg);
   const organizations = useAuthStore((s) => s.organizations);
@@ -46,10 +51,26 @@ export function OrgSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="lg" className="max-w-56 justify-between">
-          <span className="truncate">{activeOrg?.name ?? "Organizasyon"}</span>
-          <HugeiconsIcon icon={UnfoldMoreIcon} />
-        </Button>
+        {collapsed ? (
+          <Button
+            variant="outline"
+            size="icon-lg"
+            className="size-10 font-semibold"
+            aria-label={activeOrg?.name ?? "Organizasyon"}
+            title={activeOrg?.name ?? "Organizasyon"}
+          >
+            {orgInitial(activeOrg?.name)}
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="lg"
+            className="max-w-56 justify-between"
+          >
+            <span className="truncate">{activeOrg?.name ?? "Organizasyon"}</span>
+            <HugeiconsIcon icon={UnfoldMoreIcon} />
+          </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuLabel>Organizasyonlar</DropdownMenuLabel>

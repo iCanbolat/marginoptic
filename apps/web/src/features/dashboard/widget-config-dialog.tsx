@@ -45,13 +45,24 @@ export function WidgetConfigDialog({
   widget: DashboardWidget | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onSave: (id: string, config: WidgetConfig) => void;
+  onSave: (
+    id: string,
+    config: WidgetConfig,
+    size: { w: number; h: number },
+  ) => void;
 }) {
   const [cfg, setCfg] = useState<WidgetConfig>({});
+  const [size, setSize] = useState({ w: 4, h: 4 });
 
   useEffect(() => {
-    if (widget) setCfg(widget.config ?? {});
+    if (widget) {
+      setCfg(widget.config ?? {});
+      setSize({ w: widget.layout.w, h: widget.layout.h });
+    }
   }, [widget]);
+
+  const clamp = (v: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, Number.isFinite(v) ? v : min));
 
   const { data: customMetrics = [] } = useQuery({
     queryKey: ["custom-metrics"],
@@ -83,15 +94,18 @@ export function WidgetConfigDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="w-title">Başlık (opsiyonel)</Label>
-            <Input
-              id="w-title"
-              value={cfg.title ?? ""}
-              placeholder={WIDGET_LABEL[widget.type]}
-              onChange={(e) => set({ title: e.target.value })}
-            />
-          </div>
+          {/* KPI başlığı metrik adından gelir; diğer widget'larda özel başlık opsiyonel. */}
+          {widget.type !== "kpi" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="w-title">Başlık (opsiyonel)</Label>
+              <Input
+                id="w-title"
+                value={cfg.title ?? ""}
+                placeholder={WIDGET_LABEL[widget.type]}
+                onChange={(e) => set({ title: e.target.value })}
+              />
+            </div>
+          )}
 
           {widget.type === "kpi" && (
             <>
@@ -204,6 +218,31 @@ export function WidgetConfigDialog({
             </Field>
           )}
 
+          <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
+            <Field label="Genişlik (1–12 kolon)">
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={size.w}
+                onChange={(e) =>
+                  setSize((s) => ({ ...s, w: clamp(Number(e.target.value), 1, 12) }))
+                }
+              />
+            </Field>
+            <Field label="Yükseklik (1–24 satır)">
+              <Input
+                type="number"
+                min={1}
+                max={24}
+                value={size.h}
+                onChange={(e) =>
+                  setSize((s) => ({ ...s, h: clamp(Number(e.target.value), 1, 24) }))
+                }
+              />
+            </Field>
+          </div>
+
           <DateOverrideField cfg={cfg} set={set} />
         </div>
 
@@ -213,7 +252,7 @@ export function WidgetConfigDialog({
           </Button>
           <Button
             onClick={() => {
-              onSave(widget.id, cfg);
+              onSave(widget.id, cfg, size);
               onOpenChange(false);
             }}
           >

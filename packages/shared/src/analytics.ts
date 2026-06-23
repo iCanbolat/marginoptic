@@ -110,6 +110,10 @@ export interface TimeseriesResponse {
 export interface ProductRankingRow extends ProductProfitRow {
   storeId: string;
   storeName: string;
+  /** Önceki dönem net kârı (yalnızca compare açıkken; aksi halde null). */
+  previousNetProfit: string | null;
+  /** Net kârın önceki döneme göre yüzde değişimi (compare kapalıysa null). */
+  netProfitDelta: number | null;
 }
 
 export interface ProductRankingResponse {

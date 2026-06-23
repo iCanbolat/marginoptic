@@ -28,7 +28,7 @@ describe("etsy-normalizer", () => {
     it("fiyat, sku ve durum doğru eşlenir", () => {
       const [listing] = generateEtsySynthetic("products", "demo-shop");
       const p = normalizeEtsyListing(listing);
-      expect(p.title).toBe("Etsy El Yapımı Ürün 1");
+      expect(p.title).toBe("El Yapımı Kolye");
       expect(p.status).toBe("active");
       expect(p.variants).toHaveLength(1);
       expect(p.variants[0]!.price).toBe("24.99");

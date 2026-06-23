@@ -3,48 +3,54 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/dm-sans";
+@import "@fontsource-variable/oxanium";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
   color-scheme: light dark;
   --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.153 0.006 107.1);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
+  --card-foreground: oklch(0.153 0.006 107.1);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.457 0.24 277.023);
-  --primary-foreground: oklch(0.962 0.018 272.314);
+  --popover-foreground: oklch(0.153 0.006 107.1);
+  --primary: oklch(0.514 0.222 16.935);
+  --primary-foreground: oklch(0.969 0.015 12.422);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.966 0.005 106.5);
+  --muted-foreground: oklch(0.58 0.031 107.3);
+  --accent: oklch(0.966 0.005 106.5);
+  --accent-foreground: oklch(0.228 0.013 107.4);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.511 0.262 276.966);
-  --sidebar-primary-foreground: oklch(0.962 0.018 272.314);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --border: oklch(0.93 0.007 106.5);
+  --input: oklch(0.93 0.007 106.5);
+  --ring: oklch(0.737 0.021 106.9);
+  /* Vurgu tonları + kategorik grafik paleti (light).
+     Donut/çoklu seri okunabilirliği için hue'lar belirgin ayrık:
+     kırmızı(marka) → turuncu → amber → teal → mavi. */
+  --accent-teal: oklch(0.704 0.123 195.05);
+  --accent-amber: oklch(0.806 0.158 79.2);
+  --chart-1: oklch(0.586 0.222 17.585);
+  --chart-2: oklch(0.700 0.170 52);
+  --chart-3: oklch(0.800 0.135 90);
+  --chart-4: oklch(0.660 0.130 175);
+  --chart-5: oklch(0.550 0.170 264);
+  --radius: 0;
+  --sidebar: oklch(0.988 0.003 106.5);
+  --sidebar-foreground: oklch(0.153 0.006 107.1);
+  --sidebar-primary: oklch(0.586 0.253 17.585);
+  --sidebar-primary-foreground: oklch(0.969 0.015 12.422);
+  --sidebar-accent: oklch(0.966 0.005 106.5);
+  --sidebar-accent-foreground: oklch(0.228 0.013 107.4);
+  --sidebar-border: oklch(0.93 0.007 106.5);
+  --sidebar-ring: oklch(0.737 0.021 106.9);
 }
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'DM Sans Variable', sans-serif;
+  --font-sans: 'Oxanium Variable', sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -53,6 +59,8 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-accent-teal: var(--accent-teal);
+  --color-accent-amber: var(--accent-amber);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -86,37 +94,40 @@
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.398 0.195 277.366);
-  --primary-foreground: oklch(0.962 0.018 272.314);
+  --background: oklch(0.153 0.006 107.1);
+  --foreground: oklch(0.988 0.003 106.5);
+  --card: oklch(0.228 0.013 107.4);
+  --card-foreground: oklch(0.988 0.003 106.5);
+  --popover: oklch(0.228 0.013 107.4);
+  --popover-foreground: oklch(0.988 0.003 106.5);
+  --primary: oklch(0.455 0.188 13.697);
+  --primary-foreground: oklch(0.969 0.015 12.422);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.286 0.016 107.4);
+  --muted-foreground: oklch(0.737 0.021 106.9);
+  --accent: oklch(0.286 0.016 107.4);
+  --accent-foreground: oklch(0.988 0.003 106.5);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
+  --ring: oklch(0.58 0.031 107.3);
+  /* Vurgu tonları + kategorik grafik paleti (dark: koyu zeminde okunur için biraz daha açık). */
+  --accent-teal: oklch(0.75 0.123 195.05);
+  --accent-amber: oklch(0.83 0.158 79.2);
+  --chart-1: oklch(0.650 0.210 17.585);
+  --chart-2: oklch(0.740 0.165 52);
+  --chart-3: oklch(0.830 0.140 90);
+  --chart-4: oklch(0.720 0.125 175);
+  --chart-5: oklch(0.630 0.175 264);
   --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.585 0.233 277.117);
-  --sidebar-primary-foreground: oklch(0.962 0.018 272.314);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.988 0.003 106.5);
+  --sidebar-primary: oklch(0.645 0.246 16.439);
+  --sidebar-primary-foreground: oklch(0.969 0.015 12.422);
+  --sidebar-accent: oklch(0.286 0.016 107.4);
+  --sidebar-accent-foreground: oklch(0.988 0.003 106.5);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
+  --sidebar-ring: oklch(0.58 0.031 107.3);
 }
 
 @layer base {
@@ -128,5 +139,32 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Auth arkaplanı: yavaşça süzülen bulanık bloblar (saf CSS, framer-motion yok). */
+@keyframes blob-float {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(6%, -8%) scale(1.12);
+  }
+  66% {
+    transform: translate(-7%, 5%) scale(0.92);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob-float 22s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-blob {
+    animation: none;
   }
 }

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Layout } from "react-grid-layout";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { DashboardSquare01Icon } from "@hugeicons/core-free-icons";
@@ -32,6 +31,18 @@ const daysAgoIso = (n: number): string => {
   d.setUTCDate(d.getUTCDate() - n);
   return d.toISOString().slice(0, 10);
 };
+
+/** Kayıtlı layout'tan görsel sıra (üstten alta, soldan sağa). */
+function orderWidgets(ws: DashboardWidget[]): DashboardWidget[] {
+  return [...ws].sort(
+    (a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x,
+  );
+}
+
+/** Dizi sırasını layout'a yaz (sürükle-bırak sırası kalıcı olsun). */
+function normalizeOrder(ws: DashboardWidget[]): DashboardWidget[] {
+  return ws.map((w, i) => ({ ...w, layout: { ...w.layout, x: 0, y: i } }));
+}
 
 /** Starter pano (ilk kurulumda) — KPI'lar + trend + maliyet + P&L + ürünler. */
 function starterWidgets(): DashboardWidget[] {
@@ -90,7 +101,8 @@ export function DashboardPage() {
     enabled: activeId != null,
   });
   const active = dashboards.find((d) => d.id === activeId);
-  const widgets = editing && draft ? draft : (detailQ.data?.widgets ?? []);
+  const widgets =
+    editing && draft ? draft : orderWidgets(detailQ.data?.widgets ?? []);
 
   const saveMut = useMutation({
     mutationFn: (next: DashboardWidget[]) =>
@@ -120,7 +132,7 @@ export function DashboardPage() {
   });
 
   const startEdit = () => {
-    setDraft(detailQ.data?.widgets ?? []);
+    setDraft(orderWidgets(detailQ.data?.widgets ?? []));
     setEditing(true);
   };
   const cancelEdit = () => {
@@ -128,26 +140,20 @@ export function DashboardPage() {
     setEditing(false);
   };
 
-  const onLayoutChange = (layout: Layout[]) => {
+  // dnd-kit yeniden sıralama: taslağı yeni diziyle değiştir.
+  const onReorder = (next: DashboardWidget[]) => {
     if (!editing) return;
-    setDraft((prev) => {
-      const base = prev ?? detailQ.data?.widgets ?? [];
-      return base.map((w) => {
-        const l = layout.find((x) => x.i === w.id);
-        return l ? { ...w, layout: { x: l.x, y: l.y, w: l.w, h: l.h } } : w;
-      });
-    });
+    setDraft(next);
   };
 
   const addWidget = (type: WidgetType) => {
     const def = WIDGET_DEFAULTS[type];
-    const base = draft ?? detailQ.data?.widgets ?? [];
-    const maxY = base.reduce((m, w) => Math.max(m, w.layout.y + w.layout.h), 0);
+    const base = draft ?? orderWidgets(detailQ.data?.widgets ?? []);
     const widget: DashboardWidget = {
       id: newId(),
       type,
       config: def.config,
-      layout: { x: 0, y: maxY, w: def.w, h: def.h },
+      layout: { x: 0, y: base.length, w: def.w, h: def.h },
     };
     setDraft([...base, widget]);
     if (!editing) setEditing(true);
@@ -156,9 +162,17 @@ export function DashboardPage() {
   const removeWidget = (id: string) =>
     setDraft((prev) => (prev ?? []).filter((w) => w.id !== id));
 
-  const saveConfig = (id: string, config: WidgetConfig) =>
+  const saveConfig = (
+    id: string,
+    config: WidgetConfig,
+    size: { w: number; h: number },
+  ) =>
     setDraft((prev) =>
-      (prev ?? []).map((w) => (w.id === id ? { ...w, config } : w)),
+      (prev ?? []).map((w) =>
+        w.id === id
+          ? { ...w, config, layout: { ...w.layout, w: size.w, h: size.h } }
+          : w,
+      ),
     );
 
   const configWidget = (draft ?? widgets).find((w) => w.id === configId) ?? null;
@@ -196,7 +210,7 @@ export function DashboardPage() {
                   <Button
                     size="sm"
                     disabled={saveMut.isPending}
-                    onClick={() => saveMut.mutate(draft ?? [])}
+                    onClick={() => saveMut.mutate(normalizeOrder(draft ?? []))}
                   >
                     {saveMut.isPending ? "Kaydediliyor…" : "Kaydet"}
                   </Button>
@@ -237,7 +251,7 @@ export function DashboardPage() {
           widgets={widgets}
           globalFilter={globalFilter}
           editing={editing}
-          onLayoutChange={onLayoutChange}
+          onReorder={onReorder}
           onConfigure={setConfigId}
           onRemove={removeWidget}
         />

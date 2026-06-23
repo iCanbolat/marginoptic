@@ -19,13 +19,28 @@ export function WidgetRenderer({
   const filter = toParams(globalFilter, widget.config.dateOverride ?? null);
   switch (widget.type) {
     case "kpi":
-      return <KpiWidget config={widget.config} filter={filter} />;
+      // KPI trend rozeti widget'ın kendi compare ayarından (veya global) gelsin.
+      return (
+        <KpiWidget
+          config={widget.config}
+          filter={{
+            ...filter,
+            compare: (widget.config.compare ?? false) || filter.compare,
+          }}
+        />
+      );
     case "timeseries":
       return <TimeseriesWidget config={widget.config} filter={filter} />;
     case "pnl":
       return <PnlWidget filter={filter} />;
     case "products":
-      return <ProductsWidget config={widget.config} filter={filter} />;
+      // Ürün satırlarında trend için önceki dönemi her zaman getir.
+      return (
+        <ProductsWidget
+          config={widget.config}
+          filter={{ ...filter, compare: true }}
+        />
+      );
     case "cost_breakdown":
       return <CostBreakdownWidget filter={filter} />;
     case "channel":

@@ -94,7 +94,20 @@
       "Bash(cat apps/api/nest-cli.json)",
       "Bash(pkill -f \"dist/main\")",
       "Bash(pnpm --filter web add -D @playwright/test)",
-      "Bash(pnpm exec *)"
+      "Bash(pnpm exec *)",
+      "Bash(node -e \"const i=require\\('./apps/web/node_modules/@hugeicons/core-free-icons'\\); const want=['Dashboard','ShoppingBag','ShoppingCart','Package','Coins','Money','Megaphone','Megaphon','Ads','PlugSocket','Connect','UserGroup','UserMultiple','Key','CreditCard','Invoice','SidebarLeft','MenuCollapse','ArrowLeft','ArrowRight','PanelLeft','Store','Building'];const keys=Object.keys\\(i\\);for\\(const w of want\\){const m=keys.filter\\(k=>k.toLowerCase\\(\\).includes\\(w.toLowerCase\\(\\)\\)\\).slice\\(0,6\\);if\\(m.length\\)console.log\\(w,'=>',m.join\\(', '\\)\\)}\")",
+      "Bash(pnpm --filter @churnify/api test -- synthetic ad-connectors etsy-normalizer shopify-normalizer)",
+      "Bash(pnpm seed:dev)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"demo@churnify.dev\",\"password\":\"demodemo123\"}')",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);t=d.get\\('totals',{}\\);print\\('revenue:',t.get\\('revenue'\\),'| netProfit:',t.get\\('netProfit'\\),'| adSpend:',t.get\\('adSpend'\\),'| orders:',t.get\\('ordersCount'\\),'| roas:',t.get\\('roas'\\)\\)\")",
+      "Bash(pnpm --filter @churnify/shared typecheck)",
+      "Bash(python3 -c ' *)",
+      "Bash(grep -A6 '\"peerDependencies\"' __TRACKED_VAR__/package.json)",
+      "Bash(grep '\"repository\"\\\\|\"description\"\\\\|\"version\"' __TRACKED_VAR__/package.json)",
+      "Bash(grep -n 'findDOMNode\\\\|nodeRef' __TRACKED_VAR__/build/cjs/Draggable.js)",
+      "Bash(node -e \"try{require.resolve\\('radix-ui'\\);console.log\\('radix-ui ok'\\)}catch\\(e\\){console.log\\('no radix-ui'\\)}\")",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('exports:',json.dumps\\(d.get\\('exports',{}\\),indent=1\\)\\);print\\('peer:',d.get\\('peerDependencies'\\)\\)\")",
+      "Bash(pnpm remove *)"
     ],
     "additionalDirectories": [
       "/tmp",

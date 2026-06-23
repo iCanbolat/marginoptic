@@ -256,24 +256,64 @@ export class AnalyticsService {
         .orderBy(desc(sql`sum(${productProfitDaily.netProfit})`))
         .limit(limit);
 
+      // Opsiyonel önceki dönem: ürün başına net kâr trend rozeti için.
+      const prevNetById = filter.compare
+        ? await this.previousProductNet(ids, filter.from, filter.to)
+        : null;
+
       return {
         from: filter.from,
         to: filter.to,
         storeIds: ids,
-        rows: rows.map((r) => ({
-          storeId: r.storeId,
-          storeName: nameById.get(r.storeId) ?? "—",
-          productExternalId: r.productExternalId,
-          title: r.title,
-          currency: r.currency,
-          units: r.units,
-          revenue: r.revenue,
-          cogs: r.cogs,
-          attributedAdSpend: r.attributedAdSpend,
-          netProfit: r.netProfit,
-        })),
+        rows: rows.map((r) => {
+          const prevNet = prevNetById?.get(
+            `${r.storeId}:${r.productExternalId}`,
+          );
+          const netProfitDelta =
+            prevNet != null ? pctChange(num(r.netProfit), prevNet) : null;
+          return {
+            storeId: r.storeId,
+            storeName: nameById.get(r.storeId) ?? "—",
+            productExternalId: r.productExternalId,
+            title: r.title,
+            currency: r.currency,
+            units: r.units,
+            revenue: r.revenue,
+            cogs: r.cogs,
+            attributedAdSpend: r.attributedAdSpend,
+            netProfit: r.netProfit,
+            previousNetProfit: prevNet != null ? f4(prevNet) : null,
+            netProfitDelta,
+          };
+        }),
       };
     });
+  }
+
+  /** Önceki dönem net kârı: `storeId:productExternalId` → toplam net kâr. */
+  private async previousProductNet(
+    storeIds: string[],
+    from: string,
+    to: string,
+  ): Promise<Map<string, number>> {
+    const prev = previousRange(from, to);
+    const rows = await this.db
+      .select({
+        storeId: productProfitDaily.storeId,
+        productExternalId: productProfitDaily.productExternalId,
+        netProfit: sql<string>`sum(${productProfitDaily.netProfit})`,
+      })
+      .from(productProfitDaily)
+      .where(
+        and(
+          inArray(productProfitDaily.storeId, storeIds),
+          between(productProfitDaily.date, prev.from, prev.to),
+        ),
+      )
+      .groupBy(productProfitDaily.storeId, productProfitDaily.productExternalId);
+    return new Map(
+      rows.map((r) => [`${r.storeId}:${r.productExternalId}`, num(r.netProfit)]),
+    );
   }
 
   // ---- Reklam performansı (org genelinde, çok-mağaza) ----

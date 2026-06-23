@@ -9,9 +9,32 @@ function seed(shop: string): number {
   return 200000 + h * 100;
 }
 
-const LISTING_COUNT = 5;
-const BUYER_COUNT = 4;
-const RECEIPT_COUNT = 8;
+const LISTING_COUNT = 10;
+const BUYER_COUNT = 25;
+const RECEIPT_COUNT = 120;
+/** Makbuzlar bugünden geriye bu kadar güne yayılır (dashboard varsayılan aralığını kapsar). */
+const WINDOW_DAYS = 180;
+
+const LISTING_NAMES = [
+  "El Yapımı Kolye",
+  "Vintage Poster",
+  "Makrome Duvar Süsü",
+  "Seramik Saksı",
+  "Dokuma Halı",
+  "Ahşap Kaşık Seti",
+  "El Örgüsü Patik",
+  "Doğal Taş Bileklik",
+  "Keçe Oyuncak",
+  "Cam Süs",
+];
+
+function listingName(idx: number): string {
+  return LISTING_NAMES[idx % LISTING_NAMES.length];
+}
+
+function listingPrice(idx: number): number {
+  return 24.99 + idx * 6;
+}
 
 /** Etsy Money objesi (amount tamsayı, divisor 100). */
 const money = (n: number, currency = "USD"): Json => ({
@@ -20,22 +43,27 @@ const money = (n: number, currency = "USD"): Json => ({
   currency_code: currency,
 });
 
-/** ISO yok — Etsy unix saniye kullanır. */
-const unix = (iso: string): number => Math.floor(new Date(iso).getTime() / 1000);
+/** Bugünden `offset` gün önce, Etsy unix saniye (deterministik gün, generation anına göre). */
+function unixDaysAgo(offset: number): number {
+  const d = new Date();
+  d.setUTCHours(12, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - offset);
+  return Math.floor(d.getTime() / 1000);
+}
 
 function syntheticListings(shop: string): Json[] {
   const base = seed(shop);
   return Array.from({ length: LISTING_COUNT }, (_, i) => ({
     listing_id: base + i,
-    title: `Etsy El Yapımı Ürün ${i + 1}`,
+    title: listingName(i),
     url: `https://www.etsy.com/listing/${base + i}`,
     state: "active",
     taxonomy_id: 1000 + i,
-    quantity: 50 - i * 5,
-    price: money(24.99 + i * 6),
+    quantity: 50 - i * 3,
+    price: money(listingPrice(i)),
     skus: [`ETSY-SKU-${i + 1}`],
-    created_timestamp: unix("2025-01-01T00:00:00Z"),
-    updated_timestamp: unix("2025-06-01T00:00:00Z"),
+    created_timestamp: unixDaysAgo(WINDOW_DAYS + 30),
+    updated_timestamp: unixDaysAgo(7),
   }));
 }
 
@@ -46,10 +74,10 @@ function syntheticBuyers(shop: string): Json[] {
     primary_email: `etsybuyer${i + 1}@example.com`,
     first_name: "Etsy",
     last_name: `Alıcı ${i + 1}`,
-    orders_count: i + 1,
-    total_spent: money(60 + i * 35),
-    create_timestamp: unix("2025-01-05T00:00:00Z"),
-    update_timestamp: unix("2025-06-10T00:00:00Z"),
+    orders_count: (i % 5) + 1,
+    total_spent: money(60 + (i % 10) * 35),
+    create_timestamp: unixDaysAgo(WINDOW_DAYS + 20),
+    update_timestamp: unixDaysAgo(3),
   }));
 }
 
@@ -62,15 +90,16 @@ function syntheticReceipts(shop: string): Json[] {
     const listingIdx = i % LISTING_COUNT;
     const listingId = lbase + listingIdx;
     const qty = (i % 3) + 1;
-    const unit = 24.99 + listingIdx * 6;
+    const unit = listingPrice(listingIdx);
     const discount = i % 4 === 0 ? 5 : 0;
     const subtotal = unit * qty - discount;
     const tax = subtotal * 0.08;
     const shipping = 5.5;
     const grand = subtotal + tax + shipping;
-    const day = String((i % 27) + 1).padStart(2, "0");
-    const ts = unix(`2025-05-${day}T12:00:00Z`);
-    const isRefunded = i % 5 === 0;
+    const dayOffset =
+      WINDOW_DAYS - 1 - Math.floor((i * WINDOW_DAYS) / RECEIPT_COUNT);
+    const ts = unixDaysAgo(dayOffset);
+    const isRefunded = i % 9 === 0;
 
     return {
       receipt_id: rid,
@@ -95,7 +124,7 @@ function syntheticReceipts(shop: string): Json[] {
           listing_id: listingId,
           product_id: Number(`${listingId}0`),
           sku: `ETSY-SKU-${listingIdx + 1}`,
-          title: `Etsy El Yapımı Ürün ${listingIdx + 1}`,
+          title: listingName(listingIdx),
           quantity: qty,
           price: money(unit),
         },

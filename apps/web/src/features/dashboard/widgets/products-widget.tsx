@@ -3,6 +3,7 @@ import type { AnalyticsFilterParams } from "@/lib/api";
 import { count, money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TrendBadge } from "@/components/trend-badge";
 import { useProducts } from "../use-analytics";
 
 export function ProductsWidget({
@@ -22,6 +23,9 @@ export function ProductsWidget({
       </p>
     );
 
+  // En az bir satırda trend verisi varsa (compare açık) trend sütununu göster.
+  const showTrend = q.data.rows.some((r) => r.netProfitDelta != null);
+
   return (
     <table className="w-full text-sm">
       <thead>
@@ -29,13 +33,17 @@ export function ProductsWidget({
           <th className="pb-1 text-left font-medium">Ürün</th>
           <th className="pb-1 text-right font-medium">Adet</th>
           <th className="pb-1 text-right font-medium">Net Kâr</th>
+          {showTrend && <th className="pb-1 text-right font-medium">Trend</th>}
         </tr>
       </thead>
       <tbody>
         {q.data.rows.map((r) => {
           const net = Number(r.netProfit);
           return (
-            <tr key={`${r.storeId}-${r.productExternalId}`} className="border-b border-border/40 last:border-0">
+            <tr
+              key={`${r.storeId}-${r.productExternalId}`}
+              className="border-b border-border/40 last:border-0"
+            >
               <td className="max-w-0 truncate py-1.5 pr-2">
                 {r.title ?? r.productExternalId}
               </td>
@@ -50,6 +58,17 @@ export function ProductsWidget({
               >
                 {money(r.netProfit, r.currency)}
               </td>
+              {showTrend && (
+                <td className="py-1.5 pl-2 text-right">
+                  {r.netProfitDelta != null ? (
+                    <div className="flex justify-end">
+                      <TrendBadge delta={r.netProfitDelta} />
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+              )}
             </tr>
           );
         })}

@@ -8,32 +8,52 @@ import {
 import type { DashboardWidget } from "@churnify/shared";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { WIDGET_LABEL } from "./metric-catalog";
+import { WIDGET_LABEL, metricMeta } from "./metric-catalog";
+
+/** Widget başlığı: KPI'lar metrik adını kullanır (özel başlık gerekmez). */
+function widgetTitle(widget: DashboardWidget): string {
+  if (widget.type === "kpi") {
+    return metricMeta(widget.config.metric ?? "netProfit").label;
+  }
+  return widget.config.title?.trim() || WIDGET_LABEL[widget.type];
+}
 
 /** Widget kabuğu: başlık + (düzenleme modunda) sürükle/ayar/sil + içerik. */
 export function WidgetFrame({
   widget,
   editing,
+  dragging = false,
+  dragHandleRef,
   onConfigure,
   onRemove,
   children,
 }: {
   widget: DashboardWidget;
   editing: boolean;
+  /** Sürüklenen widget mi (görsel vurgu için). */
+  dragging?: boolean;
+  /** dnd-kit sürükleme tutamacı ref'i (yalnızca düzenleme modunda başlığa bağlanır). */
+  dragHandleRef?: (element: Element | null) => void;
   onConfigure: () => void;
   onRemove: () => void;
   children: ReactNode;
 }) {
-  const title = widget.config.title?.trim() || WIDGET_LABEL[widget.type];
+  const title = widgetTitle(widget);
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
-      <div
-        className={cn(
-          "flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2",
-          editing && "widget-drag-handle cursor-move",
-        )}
-      >
-        <div className="flex min-w-0 items-center gap-1.5">
+    <div
+      className={cn(
+        "flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm",
+        dragging && "shadow-lg ring-2 ring-primary/40",
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+        <div
+          ref={editing ? dragHandleRef : undefined}
+          className={cn(
+            "flex min-w-0 items-center gap-1.5",
+            editing && "cursor-grab touch-none active:cursor-grabbing",
+          )}
+        >
           {editing && (
             <HugeiconsIcon
               icon={DragDropIcon}
@@ -44,7 +64,7 @@ export function WidgetFrame({
           <span className="truncate text-sm font-medium">{title}</span>
         </div>
         {editing && (
-          <div className="widget-no-drag flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-0.5">
             <Button
               variant="ghost"
               size="icon-sm"

@@ -6,13 +6,21 @@ import type {
 
 /**
  * Dev reklam bağlantıları için gerçek sağlayıcı olmadan deterministik insight üretir.
- * Sentetik sipariş penceresiyle (2025-05) örtüşür ki blended ROAS/POAS anlamlı olsun.
+ * Sentetik sipariş penceresiyle (bugünden geriye ~6 ay) örtüşür ki blended ROAS/POAS
+ * anlamlı olsun ve dashboard varsayılan aralığı reklam harcaması göstersin.
  * Hiyerarşi: 2 kampanya × 2 adset × 2 ad = 8 ad; adset/kampanya satırları ad'lardan toplanır.
  */
 
-const WINDOW_START = "2025-05-01";
-const WINDOW_DAYS = 14;
+const WINDOW_DAYS = 180;
 const AD_COUNT = 8; // adset = floor(a/2), campaign = floor(a/4)
+
+/** Pencere başlangıcı: bugünden (WINDOW_DAYS - 1) gün öncesi (UTC). */
+function windowStart(): string {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - (WINDOW_DAYS - 1));
+  return d.toISOString().slice(0, 10);
+}
 
 /** Hesap kimliğinden deterministik sayısal taban. */
 function seed(account: string): number {
@@ -54,6 +62,7 @@ function leaf(a: number, di: number): Leaf {
 
 export function generateSyntheticAds(account: string): AdInsightsResult {
   const s = seed(account);
+  const start = windowStart();
   const cmpId = (c: number) => `c_${s}_${c}`;
   const astId = (a: number) => `as_${s}_${a}`;
   const adId = (a: number) => `ad_${s}_${a}`;
@@ -100,7 +109,7 @@ export function generateSyntheticAds(account: string): AdInsightsResult {
   // ---- spend (gün başına; ad satırları + toplanmış adset/campaign) ----
   const spend: AdSpendRow[] = [];
   for (let di = 0; di < WINDOW_DAYS; di++) {
-    const date = dayIso(WINDOW_START, di);
+    const date = dayIso(start, di);
     const byAdset = new Map<number, Leaf>();
     const byCampaign = new Map<number, Leaf>();
     const add = (m: Map<number, Leaf>, k: number, l: Leaf) => {

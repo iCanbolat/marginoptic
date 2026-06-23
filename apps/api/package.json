@@ -9,6 +9,7 @@
     "dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "seed:dev": "node scripts/seed-dev.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "jest --passWithNoTests",
