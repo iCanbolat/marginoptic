@@ -16,7 +16,7 @@ export interface OrdersParams {
 }
 
 /** Varsayılan sayfa boyutu + "Sayfa başına" seçenekleri. */
-export const PAGE_SIZE = 25;
+export const PAGE_SIZE = 10;
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
 /** Select'te "tümü" sentinel'i (boş string SelectItem'a verilemez). */
