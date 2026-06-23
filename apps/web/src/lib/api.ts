@@ -1,7 +1,5 @@
 import type {
-  AdConnectInput,
   AdLevel,
-  AdProvider,
   AdsPerformanceResponse,
   ApiKeyCreateInput,
   ApiKeyCreatedResponse,
@@ -37,16 +35,13 @@ import type {
   CustomExpenseUpdate,
   ExpenseAllocationRow,
   HealthResponse,
-  IntegrationsOverview,
   InvitationCreatedResponse,
   InvitationView,
   InviteMemberInput,
   LoginInput,
   MemberView,
   MeResponse,
-  OrderRow,
   OrgSummary,
-  Paginated,
   PaymentFeeRuleInput,
   PaymentFeeRuleSummary,
   RegisterInput,
@@ -54,7 +49,6 @@ import type {
   SessionResponse,
   ShippingRuleInput,
   ShippingRuleSummary,
-  ShopifyInstallResponse,
   StoreSummary,
   StoreSyncStatus,
   SwitchOrgResponse,
@@ -62,35 +56,25 @@ import type {
   TaxConfigSummary,
 } from "@churnify/shared";
 import { useAuthStore } from "./auth/store";
+import { refreshSession } from "./auth/refresh";
+import { ApiError, toApiError } from "./errors";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 /** MCP Streamable HTTP ucu — per-org API key ile erişilir (Faz 8). */
 export const MCP_ENDPOINT = `${API_URL}/api/mcp`;
 
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-    public readonly issues?: { path: string; message: string }[],
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
+// Geriye dönük uyumluluk: mevcut `import { ApiError } from "@/lib/api"` çağrıları çalışsın.
+export { ApiError } from "./errors";
 
 async function toError(res: Response): Promise<ApiError> {
-  let message = `İstek başarısız (${res.status})`;
-  let issues: { path: string; message: string }[] | undefined;
+  let body: unknown;
   try {
-    const body = await res.json();
-    const err = body?.error ?? body;
-    if (typeof err?.message === "string") message = err.message;
-    if (Array.isArray(err?.issues)) issues = err.issues;
+    body = await res.json();
   } catch {
     /* gövde JSON değil */
   }
-  return new ApiError(res.status, message, issues);
+  return toApiError(res.status, body);
 }
 
 function request(
@@ -107,25 +91,6 @@ function request(
       ...init?.headers,
     },
   });
-}
-
-// Aynı anda birden fazla 401 olursa tek bir refresh çalışsın
-let refreshing: Promise<string | null> | null = null;
-
-function refreshSession(): Promise<string | null> {
-  refreshing ??= (async () => {
-    const res = await request("/auth/refresh", { method: "POST" }, null);
-    if (!res.ok) {
-      useAuthStore.getState().clear();
-      return null;
-    }
-    const session = (await res.json()) as SessionResponse;
-    useAuthStore.getState().setSession(session);
-    return session.accessToken;
-  })().finally(() => {
-    refreshing = null;
-  });
-  return refreshing;
 }
 
 /** Auth'lu istek: access token ekler, 401'de bir kez refresh deneyip tekrar dener. */
@@ -194,36 +159,8 @@ export const orgApi = {
     apiFetch<void>(`/organizations/members/${userId}`, { method: "DELETE" }),
 };
 
-export const integrationsApi = {
-  overview: () => apiFetch<IntegrationsOverview>("/integrations"),
-  shopifyInstall: (shop: string) =>
-    apiFetch<ShopifyInstallResponse>(
-      `/integrations/shopify/install?shop=${encodeURIComponent(shop)}`,
-    ),
-  devConnect: (shop: string) =>
-    apiFetch<{ storeId: string; connectionId: string }>(
-      "/integrations/shopify/dev-connect",
-      { method: "POST", body: JSON.stringify({ shop }) },
-    ),
-  etsyInstall: () =>
-    apiFetch<ShopifyInstallResponse>("/integrations/etsy/install"),
-  etsyDevConnect: (shop: string) =>
-    apiFetch<{ storeId: string; connectionId: string }>(
-      "/integrations/etsy/dev-connect",
-      { method: "POST", body: JSON.stringify({ shop }) },
-    ),
-  disconnect: (connectionId: string) =>
-    apiFetch<void>(`/integrations/${connectionId}`, { method: "DELETE" }),
-  adInstall: (provider: AdProvider, storeId: string) =>
-    apiFetch<ShopifyInstallResponse>(
-      `/integrations/ads/${provider}/install?storeId=${encodeURIComponent(storeId)}`,
-    ),
-  adDevConnect: (provider: AdProvider, input: AdConnectInput) =>
-    apiFetch<{ connectionId: string; provider: AdProvider }>(
-      `/integrations/ads/${provider}/dev-connect`,
-      { method: "POST", body: JSON.stringify(input) },
-    ),
-};
+// NOT: integrations çağrıları artık feature içinde yaşıyor (axios):
+// `features/integrations/api/integration-api.ts`.
 
 export const storesApi = {
   list: () => apiFetch<StoreSummary[]>("/stores"),
@@ -245,25 +182,13 @@ export const adsApi = {
   },
 };
 
-export interface OrdersParams {
-  limit?: number;
-  cursor?: string;
-  financialStatus?: string;
-  search?: string;
-}
+// NOT: sipariş listeleme artık feature içinde yaşıyor (axios):
+// `features/orders/api/orders-api.ts`. Sync durumu burada kalır (sync feature +
+// data-freshness-badge kullanır).
 
 export const ingestionApi = {
   syncStatus: (storeId: string) =>
     apiFetch<StoreSyncStatus>(`/stores/${storeId}/sync`),
-  orders: (storeId: string, params: OrdersParams = {}) => {
-    const qs = new URLSearchParams();
-    if (params.limit) qs.set("limit", String(params.limit));
-    if (params.cursor) qs.set("cursor", params.cursor);
-    if (params.financialStatus) qs.set("financialStatus", params.financialStatus);
-    if (params.search) qs.set("search", params.search);
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return apiFetch<Paginated<OrderRow>>(`/stores/${storeId}/orders${suffix}`);
-  },
 };
 
 // --- Faz 4: Maliyet modelleme ---

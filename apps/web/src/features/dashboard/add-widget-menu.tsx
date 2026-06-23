@@ -16,7 +16,7 @@ export function AddWidgetMenu({ onAdd }: { onAdd: (type: WidgetType) => void }) 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="sm" className="gap-1.5">
+        <Button variant="secondary" size="sm" className="gap-1.5">
           <HugeiconsIcon icon={PlusSignIcon} strokeWidth={2} className="size-3.5" />
           Widget Ekle
         </Button>

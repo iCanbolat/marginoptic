@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { DashboardSquare01Icon } from "@hugeicons/core-free-icons";
+import {
+  DashboardSquare01Icon,
+  PencilEdit02Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
 import type {
   DashboardWidget,
   WidgetConfig,
@@ -12,6 +16,7 @@ import { dashboardsApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OnboardingChecklist } from "../onboarding/onboarding-checklist";
 import { DashboardGrid } from "./grid";
@@ -200,27 +205,45 @@ export function DashboardPage() {
         <div className="flex items-center gap-2">
           <CustomMetricsDialog canEdit={canEdit} />
           {canEdit && dashboards.length > 0 && (
-            <>
-              {editing && <AddWidgetMenu onAdd={addWidget} />}
-              {editing ? (
-                <>
-                  <Button variant="ghost" size="sm" onClick={cancelEdit}>
-                    İptal
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={saveMut.isPending}
-                    onClick={() => saveMut.mutate(normalizeOrder(draft ?? []))}
-                  >
-                    {saveMut.isPending ? "Kaydediliyor…" : "Kaydet"}
-                  </Button>
-                </>
-              ) : (
-                <Button variant="outline" size="sm" onClick={startEdit}>
-                  Düzenle
+            editing ? (
+              <div
+                key="edit-bar"
+                className="flex items-center gap-1.5 border border-border bg-muted/40 p-1 pl-2.5 shadow-sm animate-in fade-in slide-in-from-right-3 zoom-in-95 duration-200 ease-out"
+              >
+                <span className="flex items-center gap-1.5 pr-0.5 text-xs font-medium text-muted-foreground">
+                  <span className="relative flex size-1.5">
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+                    <span className="relative inline-flex size-1.5 rounded-full bg-primary" />
+                  </span>
+                  Düzenleme modu
+                </span>
+                <Separator orientation="vertical" className="h-5" />
+                <AddWidgetMenu onAdd={addWidget} />
+                <Separator orientation="vertical" className="h-5" />
+                <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                  İptal
                 </Button>
-              )}
-            </>
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={saveMut.isPending}
+                  onClick={() => saveMut.mutate(normalizeOrder(draft ?? []))}
+                >
+                  <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5" />
+                  {saveMut.isPending ? "Kaydediliyor…" : "Kaydet"}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startEdit}
+                className="gap-1.5 animate-in fade-in duration-200"
+              >
+                <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} className="size-3.5" />
+                Panoyu düzenle
+              </Button>
+            )
           )}
         </div>
       </div>

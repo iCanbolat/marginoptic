@@ -107,7 +107,13 @@
       "Bash(grep -n 'findDOMNode\\\\|nodeRef' __TRACKED_VAR__/build/cjs/Draggable.js)",
       "Bash(node -e \"try{require.resolve\\('radix-ui'\\);console.log\\('radix-ui ok'\\)}catch\\(e\\){console.log\\('no radix-ui'\\)}\")",
       "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('exports:',json.dumps\\(d.get\\('exports',{}\\),indent=1\\)\\);print\\('peer:',d.get\\('peerDependencies'\\)\\)\")",
-      "Bash(pnpm remove *)"
+      "Bash(pnpm remove *)",
+      "Bash(pnpm --filter @churnify/web add axios)",
+      "Bash(pnpm dev *)",
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(npx tsc *)",
+      "Bash(grep -rn \"export declare function count\\\\|export { count\\\\|count,\" apps/api/node_modules/drizzle-orm/index.d.ts)",
+      "Bash(node -e \"const d=require\\('./apps/api/node_modules/drizzle-orm'\\); console.log\\('count:', typeof d.count, '| sql:', typeof d.sql\\)\")"
     ],
     "additionalDirectories": [
       "/tmp",

@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, ilike, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, or } from "drizzle-orm";
 import type {
   OrderRow,
   OrdersQuery,
@@ -14,27 +14,6 @@ import {
   stores,
   syncState,
 } from "../../database/schema/stores";
-
-interface Cursor {
-  createdAt: string;
-  id: string;
-}
-
-function encodeCursor(c: Cursor): string {
-  return Buffer.from(`${c.createdAt}|${c.id}`).toString("base64url");
-}
-
-function decodeCursor(raw: string): Cursor | null {
-  try {
-    const [createdAt, id] = Buffer.from(raw, "base64url")
-      .toString("utf8")
-      .split("|");
-    if (!createdAt || !id) return null;
-    return { createdAt, id };
-  } catch {
-    return null;
-  }
-}
 
 /** Faz 3 okuma tarafı: sync durumu + ham sipariş listesi (org-kapsamlı). */
 @Injectable()
@@ -115,50 +94,37 @@ export class IngestionQueryService {
       const match = or(ilike(orders.name, like), ilike(orders.email, like));
       if (match) conds.push(match);
     }
-    if (query.cursor) {
-      const c = decodeCursor(query.cursor);
-      if (c) {
-        const keyset = or(
-          lt(orders.createdAt, new Date(c.createdAt)),
-          and(
-            eq(orders.createdAt, new Date(c.createdAt)),
-            lt(orders.id, c.id),
-          ),
-        );
-        if (keyset) conds.push(keyset);
-      }
-    }
 
-    const rows = await this.db
-      .select({
-        id: orders.id,
-        externalId: orders.externalId,
-        name: orders.name,
-        email: orders.email,
-        financialStatus: orders.financialStatus,
-        fulfillmentStatus: orders.fulfillmentStatus,
-        currency: orders.currency,
-        totalPrice: orders.totalPrice,
-        totalRefunded: orders.totalRefunded,
-        test: orders.test,
-        processedAt: orders.processedAt,
-        createdAt: orders.createdAt,
-      })
-      .from(orders)
-      .where(and(...conds))
-      .orderBy(desc(orders.createdAt), desc(orders.id))
-      .limit(query.limit + 1);
+    const where = and(...conds);
+    const offset = (query.page - 1) * query.pageSize;
 
-    const hasMore = rows.length > query.limit;
-    const page = hasMore ? rows.slice(0, query.limit) : rows;
-    const last = page.at(-1);
-    const nextCursor =
-      hasMore && last
-        ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id })
-        : null;
+    // Toplam sayım ("Sayfa X / Y" için) + sayfa verisi tek istek turunda.
+    const [[{ total }], rows] = await Promise.all([
+      this.db.select({ total: count() }).from(orders).where(where),
+      this.db
+        .select({
+          id: orders.id,
+          externalId: orders.externalId,
+          name: orders.name,
+          email: orders.email,
+          financialStatus: orders.financialStatus,
+          fulfillmentStatus: orders.fulfillmentStatus,
+          currency: orders.currency,
+          totalPrice: orders.totalPrice,
+          totalRefunded: orders.totalRefunded,
+          test: orders.test,
+          processedAt: orders.processedAt,
+          createdAt: orders.createdAt,
+        })
+        .from(orders)
+        .where(where)
+        .orderBy(desc(orders.createdAt), desc(orders.id))
+        .limit(query.pageSize)
+        .offset(offset),
+    ]);
 
     return {
-      items: page.map(
+      items: rows.map(
         (r): OrderRow => ({
           id: r.id,
           externalId: r.externalId,
@@ -174,7 +140,9 @@ export class IngestionQueryService {
           createdAt: r.createdAt.toISOString(),
         }),
       ),
-      nextCursor,
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
     };
   }
 }

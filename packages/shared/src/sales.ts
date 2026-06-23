@@ -46,16 +46,20 @@ export interface OrderRow {
   createdAt: string;
 }
 
-/** Cursor tabanlı sayfalı yanıt. */
+/** Offset tabanlı sayfalı yanıt (toplam sayım ile — "Sayfa X / Y" için). */
 export interface Paginated<T> {
   items: T[];
-  nextCursor: string | null;
+  /** Filtre uygulanmış toplam kayıt sayısı. */
+  total: number;
+  /** 1-tabanlı aktif sayfa. */
+  page: number;
+  pageSize: number;
 }
 
-/** Sipariş listesi sorgu parametreleri. */
+/** Sipariş listesi sorgu parametreleri (offset/sayfa tabanlı). */
 export const ordersQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(25),
-  cursor: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
   financialStatus: z.string().trim().min(1).max(48).optional(),
   search: z.string().trim().min(1).max(120).optional(),
 });
