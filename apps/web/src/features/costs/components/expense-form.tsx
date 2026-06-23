@@ -38,6 +38,8 @@ interface ExpenseFormProps {
   activeStoreId: string | null;
   pending: boolean;
   onSubmit: (v: CustomExpenseInput) => void;
+  /** Sheet/Dialog içinde gösterilirken dıştaki Card chrome'unu atla. */
+  embedded?: boolean;
 }
 
 type FormValues = z.input<typeof customExpenseInputSchema>;
@@ -46,6 +48,7 @@ export function ExpenseForm({
   activeStoreId,
   pending,
   onSubmit,
+  embedded,
 }: ExpenseFormProps) {
   const {
     control,
@@ -95,21 +98,12 @@ export function ExpenseForm({
     resetField("category");
   }
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Gider ekle</CardTitle>
-        <CardDescription>
-          Tek seferlik gider yalnız başlangıç gününe; yinelenen gider amortize
-          edilerek her güne yazılır.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          onSubmit={handleSubmit(submit)}
-          noValidate
-          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-        >
+  const body = (
+    <form
+      onSubmit={handleSubmit(submit)}
+      noValidate
+      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+    >
           <div className="space-y-1">
             <Label>Ad</Label>
             <Input
@@ -256,13 +250,26 @@ export function ExpenseForm({
             />
             <FieldError message={errors.endDate?.message} />
           </div>
-          <div className="col-span-2 flex items-end sm:col-span-4">
-            <Button type="submit" disabled={pending}>
-              Ekle
-            </Button>
-          </div>
-        </form>
-      </CardContent>
+      <div className="col-span-2 flex items-end sm:col-span-4">
+        <Button type="submit" disabled={pending}>
+          Ekle
+        </Button>
+      </div>
+    </form>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Gider ekle</CardTitle>
+        <CardDescription>
+          Tek seferlik gider yalnız başlangıç gününe; yinelenen gider amortize
+          edilerek her güne yazılır.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }

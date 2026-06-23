@@ -20,6 +20,8 @@ import { FieldError } from "./field-error";
 interface ShippingAddFormProps {
   pending: boolean;
   onSubmit: (v: ShippingRuleInput) => void;
+  /** Sheet/Dialog içinde gösterilirken dıştaki Card chrome'unu atla. */
+  embedded?: boolean;
 }
 
 type FormValues = z.input<typeof shippingRuleInputSchema>;
@@ -35,7 +37,11 @@ const EMPTY: FormValues = {
   perItemCost: "",
 };
 
-export function ShippingAddForm({ pending, onSubmit }: ShippingAddFormProps) {
+export function ShippingAddForm({
+  pending,
+  onSubmit,
+  embedded,
+}: ShippingAddFormProps) {
   const {
     register,
     handleSubmit,
@@ -51,17 +57,12 @@ export function ShippingAddForm({ pending, onSubmit }: ShippingAddFormProps) {
     reset(EMPTY);
   }
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Kargo kuralı ekle</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form
-          onSubmit={handleSubmit(submit)}
-          noValidate
-          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-        >
+  const body = (
+    <form
+      onSubmit={handleSubmit(submit)}
+      noValidate
+      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+    >
           <div className="space-y-1">
             <Label>Ad</Label>
             <Input
@@ -137,13 +138,22 @@ export function ShippingAddForm({ pending, onSubmit }: ShippingAddFormProps) {
             />
             <FieldError message={errors.perItemCost?.message} />
           </div>
-          <div className="col-span-2 sm:col-span-4">
-            <Button type="submit" disabled={pending}>
-              Ekle
-            </Button>
-          </div>
-        </form>
-      </CardContent>
+      <div className="col-span-2 sm:col-span-4">
+        <Button type="submit" disabled={pending}>
+          Ekle
+        </Button>
+      </div>
+    </form>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Kargo kuralı ekle</CardTitle>
+      </CardHeader>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }

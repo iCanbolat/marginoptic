@@ -29,11 +29,13 @@ import { FieldError } from "./field-error";
 interface CogsAddFormProps {
   pending: boolean;
   onSubmit: (v: CogsRuleInput) => void;
+  /** Sheet/Dialog içinde gösterilirken dıştaki Card chrome'unu atla. */
+  embedded?: boolean;
 }
 
 type FormValues = z.input<typeof cogsRuleInputSchema>;
 
-export function CogsAddForm({ pending, onSubmit }: CogsAddFormProps) {
+export function CogsAddForm({ pending, onSubmit, embedded }: CogsAddFormProps) {
   const {
     control,
     register,
@@ -68,17 +70,12 @@ export function CogsAddForm({ pending, onSubmit }: CogsAddFormProps) {
     });
   }
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Kural ekle</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form
-          onSubmit={handleSubmit(submit)}
-          noValidate
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
-        >
+  const body = (
+    <form
+      onSubmit={handleSubmit(submit)}
+      noValidate
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+    >
           <div className="space-y-1">
             <Label>Kapsam</Label>
             <Controller
@@ -149,13 +146,22 @@ export function CogsAddForm({ pending, onSubmit }: CogsAddFormProps) {
             />
             <FieldError message={errors.country?.message} />
           </div>
-          <div className="col-span-2 sm:col-span-3 lg:col-span-6">
-            <Button type="submit" disabled={pending}>
-              Ekle
-            </Button>
-          </div>
-        </form>
-      </CardContent>
+      <div className="col-span-2 sm:col-span-3 lg:col-span-6">
+        <Button type="submit" disabled={pending}>
+          Ekle
+        </Button>
+      </div>
+    </form>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Kural ekle</CardTitle>
+      </CardHeader>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }
