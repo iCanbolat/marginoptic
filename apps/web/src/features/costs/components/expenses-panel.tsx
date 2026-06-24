@@ -11,13 +11,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useExpenses } from "../hooks/use-expenses";
 import { ExpenseForm } from "./expense-form";
 import { ExpensesTable } from "./expenses-table";
@@ -42,21 +41,20 @@ export function ExpensesPanel({
         </CardDescription>
         {canEdit ? (
           <CardAction>
-            <Sheet open={addOpen} onOpenChange={setAddOpen}>
-              <SheetTrigger asChild>
-                <Button size="sm">
-                  <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={2} />
-                  Gider ekle
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="sm:max-w-2xl">
-                <SheetHeader>
-                  <SheetTitle>Gider ekle</SheetTitle>
-                  <SheetDescription>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={2} />
+              Gider ekle
+            </Button>
+
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Gider ekle</DialogTitle>
+                  <DialogDescription>
                     Tek seferlik gider yalnız başlangıç gününe; yinelenen gider
                     amortize edilerek her güne yazılır.
-                  </SheetDescription>
-                </SheetHeader>
+                  </DialogDescription>
+                </DialogHeader>
                 <ExpenseForm
                   embedded
                   activeStoreId={activeStoreId}
@@ -65,8 +63,8 @@ export function ExpensesPanel({
                     create.mutate(v, { onSuccess: () => setAddOpen(false) })
                   }
                 />
-              </SheetContent>
-            </Sheet>
+              </DialogContent>
+            </Dialog>
           </CardAction>
         ) : null}
       </CardHeader>

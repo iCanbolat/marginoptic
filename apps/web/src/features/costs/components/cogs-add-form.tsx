@@ -31,11 +31,18 @@ interface CogsAddFormProps {
   onSubmit: (v: CogsRuleInput) => void;
   /** Sheet/Dialog içinde gösterilirken dıştaki Card chrome'unu atla. */
   embedded?: boolean;
+  /** Gönder butonu etiketi (batch akışında "Listeye ekle"). */
+  submitLabel?: string;
 }
 
 type FormValues = z.input<typeof cogsRuleInputSchema>;
 
-export function CogsAddForm({ pending, onSubmit, embedded }: CogsAddFormProps) {
+export function CogsAddForm({
+  pending,
+  onSubmit,
+  embedded,
+  submitLabel = "Ekle",
+}: CogsAddFormProps) {
   const {
     control,
     register,
@@ -148,7 +155,7 @@ export function CogsAddForm({ pending, onSubmit, embedded }: CogsAddFormProps) {
           </div>
       <div className="col-span-2 sm:col-span-3 lg:col-span-6">
         <Button type="submit" disabled={pending}>
-          Ekle
+          {submitLabel}
         </Button>
       </div>
     </form>

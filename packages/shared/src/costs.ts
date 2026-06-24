@@ -77,6 +77,15 @@ export const cogsRuleInputSchema = z
   });
 export type CogsRuleInput = z.infer<typeof cogsRuleInputSchema>;
 
+/** Toplu COGS kuralı ekleme: UI'da stack'lenip tek istekte gönderilir. */
+export const cogsRuleBatchInputSchema = z.object({
+  rules: z
+    .array(cogsRuleInputSchema)
+    .min(1, "En az bir kural ekleyin")
+    .max(200, "Tek seferde en fazla 200 kural"),
+});
+export type CogsRuleBatchInput = z.infer<typeof cogsRuleBatchInputSchema>;
+
 export const cogsRuleUpdateSchema = z.object({
   matchValue: z.string().trim().min(1).max(255).nullish(),
   country: country.nullish(),
@@ -152,6 +161,15 @@ export const shippingRuleInputSchema = z
     path: ["maxQty"],
   });
 export type ShippingRuleInput = z.infer<typeof shippingRuleInputSchema>;
+
+/** Toplu kargo kuralı ekleme: UI'da stack'lenip tek istekte gönderilir. */
+export const shippingRuleBatchInputSchema = z.object({
+  rules: z
+    .array(shippingRuleInputSchema)
+    .min(1, "En az bir kural ekleyin")
+    .max(200, "Tek seferde en fazla 200 kural"),
+});
+export type ShippingRuleBatchInput = z.infer<typeof shippingRuleBatchInputSchema>;
 
 export interface ShippingRuleSummary {
   id: string;

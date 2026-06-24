@@ -87,6 +87,30 @@ export class CogsService {
     return toSummary(row!);
   }
 
+  /** Toplu ekleme: tek INSERT ifadesi (atomik). */
+  async createMany(
+    orgId: string,
+    storeId: string,
+    dtos: CogsRuleInput[],
+  ): Promise<CogsRuleSummary[]> {
+    const store = await assertStoreInOrg(this.db, orgId, storeId);
+    const values: (typeof cogsRules.$inferInsert)[] = dtos.map((dto) => ({
+      storeId,
+      scope: dto.scope,
+      matchValue: dto.scope === "global" ? null : (dto.matchValue ?? null),
+      country: dto.country ?? null,
+      minQty: dto.minQty,
+      costAmount: dto.costAmount,
+      handlingFee: dto.handlingFee ?? null,
+      currency: dto.currency ?? store.currency,
+      effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null,
+      effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
+      source: "manual",
+    }));
+    const rows = await this.db.insert(cogsRules).values(values).returning();
+    return rows.map(toSummary);
+  }
+
   async update(
     orgId: string,
     storeId: string,

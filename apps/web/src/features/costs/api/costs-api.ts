@@ -16,8 +16,10 @@ import {
   MOCK_STORES,
   USE_MOCK_COSTS,
   mockCreateCogs,
+  mockCreateCogsBatch,
   mockCreatePaymentFee,
   mockCreateShipping,
+  mockCreateShippingBatch,
   mockDeleteCogs,
   mockDeletePaymentFee,
   mockDeleteShipping,
@@ -48,6 +50,15 @@ export const costsApi = {
     USE_MOCK_COSTS
       ? resolved(mockCreateCogs(storeId, input))
       : apiPost<CogsRuleSummary>(`/stores/${storeId}/costs/cogs`, input),
+  createCogsBatch: (
+    storeId: string,
+    rules: CogsRuleInput[],
+  ): Promise<CogsRuleSummary[]> =>
+    USE_MOCK_COSTS
+      ? resolved(mockCreateCogsBatch(storeId, rules))
+      : apiPost<CogsRuleSummary[]>(`/stores/${storeId}/costs/cogs/batch`, {
+          rules,
+        }),
   deleteCogs: (storeId: string, id: string): Promise<void> =>
     USE_MOCK_COSTS
       ? resolved(mockDeleteCogs(storeId, id))
@@ -72,6 +83,16 @@ export const costsApi = {
     USE_MOCK_COSTS
       ? resolved(mockCreateShipping(storeId, input))
       : apiPost<ShippingRuleSummary>(`/stores/${storeId}/costs/shipping`, input),
+  createShippingBatch: (
+    storeId: string,
+    rules: ShippingRuleInput[],
+  ): Promise<ShippingRuleSummary[]> =>
+    USE_MOCK_COSTS
+      ? resolved(mockCreateShippingBatch(storeId, rules))
+      : apiPost<ShippingRuleSummary[]>(
+          `/stores/${storeId}/costs/shipping/batch`,
+          { rules },
+        ),
   deleteShipping: (storeId: string, id: string): Promise<void> =>
     USE_MOCK_COSTS
       ? resolved(mockDeleteShipping(storeId, id))

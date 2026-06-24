@@ -107,6 +107,36 @@ export class CostRulesService {
     return toShipping(row!);
   }
 
+  /** Toplu kargo kuralı ekleme: tek INSERT ifadesi (atomik). */
+  async createManyShipping(
+    orgId: string,
+    storeId: string,
+    dtos: ShippingRuleInput[],
+  ): Promise<ShippingRuleSummary[]> {
+    const store = await assertStoreInOrg(this.db, orgId, storeId);
+    const values: (typeof shippingCostRules.$inferInsert)[] = dtos.map(
+      (dto) => ({
+        storeId,
+        name: dto.name,
+        country: dto.country ?? null,
+        minQty: dto.minQty ?? null,
+        maxQty: dto.maxQty ?? null,
+        minWeightGrams: dto.minWeightGrams ?? null,
+        maxWeightGrams: dto.maxWeightGrams ?? null,
+        baseCost: dto.baseCost,
+        perItemCost: dto.perItemCost ?? null,
+        currency: dto.currency ?? store.currency,
+        effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null,
+        effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
+      }),
+    );
+    const rows = await this.db
+      .insert(shippingCostRules)
+      .values(values)
+      .returning();
+    return rows.map(toShipping);
+  }
+
   async updateShipping(
     orgId: string,
     storeId: string,

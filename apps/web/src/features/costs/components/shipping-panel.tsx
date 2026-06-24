@@ -10,16 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { useShipping } from "../hooks/use-shipping";
-import { ShippingAddForm } from "./shipping-add-form";
+import { ShippingBatchAddDialog } from "./shipping-batch-add-dialog";
 import { ShippingRulesTable } from "./shipping-rules-table";
 
 export function ShippingPanel({
@@ -29,7 +21,7 @@ export function ShippingPanel({
   storeId: string;
   canEdit: boolean;
 }) {
-  const { rulesQ, create, remove } = useShipping(storeId);
+  const { rulesQ, createBatch, remove } = useShipping(storeId);
   const [addOpen, setAddOpen] = useState(false);
 
   return (
@@ -42,30 +34,21 @@ export function ShippingPanel({
         </CardDescription>
         {canEdit ? (
           <CardAction>
-            <Sheet open={addOpen} onOpenChange={setAddOpen}>
-              <SheetTrigger asChild>
-                <Button size="sm">
-                  <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={2} />
-                  Kural ekle
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="sm:max-w-xl">
-                <SheetHeader>
-                  <SheetTitle>Kargo kuralı ekle</SheetTitle>
-                  <SheetDescription>
-                    Ülke, adet ve ağırlık aralığına göre kargo maliyeti
-                    tanımlayın.
-                  </SheetDescription>
-                </SheetHeader>
-                <ShippingAddForm
-                  embedded
-                  pending={create.isPending}
-                  onSubmit={(v) =>
-                    create.mutate(v, { onSuccess: () => setAddOpen(false) })
-                  }
-                />
-              </SheetContent>
-            </Sheet>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={2} />
+              Kural ekle
+            </Button>
+
+            <ShippingBatchAddDialog
+              open={addOpen}
+              onOpenChange={setAddOpen}
+              pending={createBatch.isPending}
+              onSubmit={(rules) =>
+                createBatch.mutate(rules, {
+                  onSuccess: () => setAddOpen(false),
+                })
+              }
+            />
           </CardAction>
         ) : null}
       </CardHeader>

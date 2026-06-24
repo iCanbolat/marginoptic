@@ -13,14 +13,17 @@ import {
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   cogsCsvImportSchema,
+  cogsRuleBatchInputSchema,
   cogsRuleInputSchema,
   cogsRuleUpdateSchema,
   costResolveQuerySchema,
   paymentFeeRuleInputSchema,
+  shippingRuleBatchInputSchema,
   shippingRuleInputSchema,
   taxConfigInputSchema,
   type CogsCsvImportInput,
   type CogsCsvImportResult,
+  type CogsRuleBatchInput,
   type CogsRuleInput,
   type CogsRuleSummary,
   type CogsRuleUpdate,
@@ -28,6 +31,7 @@ import {
   type CostResolveQuery,
   type PaymentFeeRuleInput,
   type PaymentFeeRuleSummary,
+  type ShippingRuleBatchInput,
   type ShippingRuleInput,
   type ShippingRuleSummary,
   type TaxConfigInput,
@@ -74,6 +78,17 @@ export class CostsController {
     @Body(new ZodValidationPipe(cogsRuleInputSchema)) dto: CogsRuleInput,
   ): Promise<CogsRuleSummary> {
     return this.cogs.create(org.id, storeId, dto);
+  }
+
+  @Post("cogs/batch")
+  @Roles(...EDIT_ROLES)
+  createCogsBatch(
+    @CurrentOrg() org: ActiveOrg,
+    @Param("storeId") storeId: string,
+    @Body(new ZodValidationPipe(cogsRuleBatchInputSchema))
+    dto: CogsRuleBatchInput,
+  ): Promise<CogsRuleSummary[]> {
+    return this.cogs.createMany(org.id, storeId, dto.rules);
   }
 
   @Patch("cogs/:id")
@@ -126,6 +141,17 @@ export class CostsController {
     @Body(new ZodValidationPipe(shippingRuleInputSchema)) dto: ShippingRuleInput,
   ): Promise<ShippingRuleSummary> {
     return this.rules.createShipping(org.id, storeId, dto);
+  }
+
+  @Post("shipping/batch")
+  @Roles(...EDIT_ROLES)
+  createShippingBatch(
+    @CurrentOrg() org: ActiveOrg,
+    @Param("storeId") storeId: string,
+    @Body(new ZodValidationPipe(shippingRuleBatchInputSchema))
+    dto: ShippingRuleBatchInput,
+  ): Promise<ShippingRuleSummary[]> {
+    return this.rules.createManyShipping(org.id, storeId, dto.rules);
   }
 
   @Patch("shipping/:id")

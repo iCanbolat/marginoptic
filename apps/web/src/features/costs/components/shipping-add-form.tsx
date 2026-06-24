@@ -22,6 +22,8 @@ interface ShippingAddFormProps {
   onSubmit: (v: ShippingRuleInput) => void;
   /** Sheet/Dialog içinde gösterilirken dıştaki Card chrome'unu atla. */
   embedded?: boolean;
+  /** Gönder butonu etiketi (batch akışında "Listeye ekle"). */
+  submitLabel?: string;
 }
 
 type FormValues = z.input<typeof shippingRuleInputSchema>;
@@ -41,6 +43,7 @@ export function ShippingAddForm({
   pending,
   onSubmit,
   embedded,
+  submitLabel = "Ekle",
 }: ShippingAddFormProps) {
   const {
     register,
@@ -140,7 +143,7 @@ export function ShippingAddForm({
           </div>
       <div className="col-span-2 sm:col-span-4">
         <Button type="submit" disabled={pending}>
-          Ekle
+          {submitLabel}
         </Button>
       </div>
     </form>

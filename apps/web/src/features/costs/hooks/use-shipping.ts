@@ -26,6 +26,16 @@ export function useShipping(storeId: string) {
     onError: (e) => toast.error(errMsg(e, "Kural eklenemedi")),
   });
 
+  const createBatch = useMutation({
+    mutationFn: (inputs: ShippingRuleInput[]) =>
+      costsApi.createShippingBatch(storeId, inputs),
+    onSuccess: (rows) => {
+      toast.success(`${rows.length} kargo kuralı eklendi`);
+      invalidate();
+    },
+    onError: (e) => toast.error(errMsg(e, "Kurallar eklenemedi")),
+  });
+
   const remove = useMutation({
     mutationFn: (id: string) => costsApi.deleteShipping(storeId, id),
     onSuccess: () => {
@@ -35,5 +45,5 @@ export function useShipping(storeId: string) {
     onError: (e) => toast.error(errMsg(e, "Silinemedi")),
   });
 
-  return { rulesQ, create, remove };
+  return { rulesQ, create, createBatch, remove };
 }

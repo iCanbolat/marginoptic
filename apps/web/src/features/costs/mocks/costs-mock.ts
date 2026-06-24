@@ -177,6 +177,13 @@ export function mockCreateCogs(
   return row;
 }
 
+export function mockCreateCogsBatch(
+  storeId: string,
+  inputs: CogsRuleInput[],
+): CogsRuleSummary[] {
+  return inputs.map((input) => mockCreateCogs(storeId, input));
+}
+
 export function mockDeleteCogs(storeId: string, id: string): void {
   cogsByStore.set(
     storeId,
@@ -255,6 +262,13 @@ export function mockCreateShipping(
   };
   shippingByStore.get(storeId)!.unshift(row);
   return row;
+}
+
+export function mockCreateShippingBatch(
+  storeId: string,
+  inputs: ShippingRuleInput[],
+): ShippingRuleSummary[] {
+  return inputs.map((input) => mockCreateShipping(storeId, input));
 }
 
 export function mockDeleteShipping(storeId: string, id: string): void {

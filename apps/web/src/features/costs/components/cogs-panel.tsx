@@ -11,15 +11,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useCogs } from "../hooks/use-cogs";
-import { CogsAddForm } from "./cogs-add-form";
+import { CogsBatchAddDialog } from "./cogs-batch-add-dialog";
 import { CogsRulesTable } from "./cogs-rules-table";
 import { CogsCsvImport } from "./cogs-csv-import";
 
@@ -30,7 +28,7 @@ export function CogsPanel({
   storeId: string;
   canEdit: boolean;
 }) {
-  const { rulesQ, create, remove, invalidate } = useCogs(storeId);
+  const { rulesQ, createBatch, remove, invalidate } = useCogs(storeId);
   const [addOpen, setAddOpen] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
 
@@ -44,21 +42,35 @@ export function CogsPanel({
         </CardDescription>
         {canEdit ? (
           <CardAction className="flex gap-2">
-            <Sheet open={csvOpen} onOpenChange={setCsvOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <HugeiconsIcon
-                    icon={FileImportIcon}
-                    size={16}
-                    strokeWidth={1.8}
-                  />
-                  CSV içe aktar
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="sm:max-w-2xl">
-                <SheetHeader>
-                  <SheetTitle className="sr-only">CSV ile içe aktar</SheetTitle>
-                </SheetHeader>
+            <Button variant="outline" size="sm" onClick={() => setCsvOpen(true)}>
+              <HugeiconsIcon
+                icon={FileImportIcon}
+                size={16}
+                strokeWidth={1.8}
+              />
+              CSV içe aktar
+            </Button>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={2} />
+              Kural ekle
+            </Button>
+
+            <CogsBatchAddDialog
+              open={addOpen}
+              onOpenChange={setAddOpen}
+              pending={createBatch.isPending}
+              onSubmit={(rules) =>
+                createBatch.mutate(rules, {
+                  onSuccess: () => setAddOpen(false),
+                })
+              }
+            />
+
+            <Dialog open={csvOpen} onOpenChange={setCsvOpen}>
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="sr-only">CSV ile içe aktar</DialogTitle>
+                </DialogHeader>
                 <CogsCsvImport
                   storeId={storeId}
                   onImported={() => {
@@ -66,32 +78,8 @@ export function CogsPanel({
                     setCsvOpen(false);
                   }}
                 />
-              </SheetContent>
-            </Sheet>
-            <Sheet open={addOpen} onOpenChange={setAddOpen}>
-              <SheetTrigger asChild>
-                <Button size="sm">
-                  <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={2} />
-                  Kural ekle
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="sm:max-w-2xl">
-                <SheetHeader>
-                  <SheetTitle>COGS kuralı ekle</SheetTitle>
-                  <SheetDescription>
-                    SKU / varyant / ürün / genel kapsamında birim maliyet
-                    tanımlayın.
-                  </SheetDescription>
-                </SheetHeader>
-                <CogsAddForm
-                  embedded
-                  pending={create.isPending}
-                  onSubmit={(v) =>
-                    create.mutate(v, { onSuccess: () => setAddOpen(false) })
-                  }
-                />
-              </SheetContent>
-            </Sheet>
+              </DialogContent>
+            </Dialog>
           </CardAction>
         ) : null}
       </CardHeader>
