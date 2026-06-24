@@ -5,6 +5,8 @@ import { SyncModule } from "../sync/sync.module";
 import { ConnectorRegistry } from "./connector.registry";
 import { CONNECTORS } from "./connector.types";
 import { EtsyConnector } from "./etsy/etsy.connector";
+import { EbayConnector } from "./ebay/ebay.connector";
+import { AmazonConnector } from "./amazon/amazon.connector";
 import { IntegrationsController } from "./integrations.controller";
 import { IntegrationsService } from "./integrations.service";
 import { ShopifyConnector } from "./shopify/shopify.connector";
@@ -16,6 +18,8 @@ import { ShopifyConnector } from "./shopify/shopify.connector";
     IntegrationsService,
     ShopifyConnector,
     EtsyConnector,
+    EbayConnector,
+    AmazonConnector,
     {
       provide: CONNECTORS,
       useFactory: (shopify: ShopifyConnector) => [shopify],

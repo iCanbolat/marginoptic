@@ -2,12 +2,18 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { IngestionModule } from "../ingestion/ingestion.module";
 import { METRICS_FLOW_PRODUCER } from "../profit/profit.constants";
+import { AmazonSyncProcessor } from "./processors/amazon-sync.processor";
+import { EbaySyncProcessor } from "./processors/ebay-sync.processor";
 import { EtsySyncProcessor } from "./processors/etsy-sync.processor";
+import { MarketplacePollProcessor } from "./processors/marketplace-poll.processor";
 import { ShopifySyncProcessor } from "./processors/shopify-sync.processor";
 import { TokenRefreshProcessor } from "./processors/token-refresh.processor";
 import { WebhooksProcessor } from "./processors/webhooks.processor";
 import {
+  QUEUE_AMAZON_SYNC,
+  QUEUE_EBAY_SYNC,
   QUEUE_ETSY_SYNC,
+  QUEUE_MARKETPLACE_POLL,
   QUEUE_SHOPIFY_SYNC,
   QUEUE_TOKEN_REFRESH,
   QUEUE_WEBHOOKS,
@@ -20,6 +26,9 @@ import { SyncService } from "./sync.service";
     BullModule.registerQueue(
       { name: QUEUE_SHOPIFY_SYNC },
       { name: QUEUE_ETSY_SYNC },
+      { name: QUEUE_EBAY_SYNC },
+      { name: QUEUE_AMAZON_SYNC },
+      { name: QUEUE_MARKETPLACE_POLL },
       { name: QUEUE_WEBHOOKS },
       { name: QUEUE_TOKEN_REFRESH },
     ),
@@ -30,6 +39,9 @@ import { SyncService } from "./sync.service";
     SyncService,
     ShopifySyncProcessor,
     EtsySyncProcessor,
+    EbaySyncProcessor,
+    AmazonSyncProcessor,
+    MarketplacePollProcessor,
     WebhooksProcessor,
     TokenRefreshProcessor,
   ],

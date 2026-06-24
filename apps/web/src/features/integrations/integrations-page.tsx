@@ -7,6 +7,8 @@ import { IntegrationCard } from "./components/integration-card";
 import { ConnectionsTable } from "./components/connections-table";
 import { ConnectShopifyDialog } from "./components/connect-shopify-dialog";
 import { ConnectEtsyDialog } from "./components/connect-etsy-dialog";
+import { ConnectEbayDialog } from "./components/connect-ebay-dialog";
+import { ConnectAmazonDialog } from "./components/connect-amazon-dialog";
 import { ConnectAdsDialog } from "./components/connect-ads-dialog";
 import { useIntegrationsOverview } from "./hooks/use-integrations-overview";
 import { useDisconnect } from "./hooks/use-disconnect";
@@ -28,6 +30,8 @@ export function IntegrationsPage() {
   // Açık connect dialog'ları (her biri lokal UI durumu).
   const [shopifyOpen, setShopifyOpen] = useState(false);
   const [etsyOpen, setEtsyOpen] = useState(false);
+  const [ebayOpen, setEbayOpen] = useState(false);
+  const [amazonOpen, setAmazonOpen] = useState(false);
   const [adsProvider, setAdsProvider] = useState<AdProvider | null>(null);
 
   // Gerçek OAuth dönüşünde ?connected=<provider>
@@ -53,6 +57,8 @@ export function IntegrationsPage() {
   function handleConnect(provider: IntegrationProvider) {
     if (provider === "shopify") setShopifyOpen(true);
     else if (provider === "etsy") setEtsyOpen(true);
+    else if (provider === "ebay") setEbayOpen(true);
+    else if (provider === "amazon") setAmazonOpen(true);
     else setAdsProvider(provider as AdProvider);
   }
 
@@ -115,6 +121,8 @@ export function IntegrationsPage() {
             onOpenChange={setShopifyOpen}
           />
           <ConnectEtsyDialog open={etsyOpen} onOpenChange={setEtsyOpen} />
+          <ConnectEbayDialog open={ebayOpen} onOpenChange={setEbayOpen} />
+          <ConnectAmazonDialog open={amazonOpen} onOpenChange={setAmazonOpen} />
           <ConnectAdsDialog
             provider={adsProvider}
             onOpenChange={(open) => {

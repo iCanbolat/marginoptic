@@ -10,11 +10,17 @@ import {
   type MetricsRollupJob,
 } from "../profit/profit.constants";
 import {
+  AMAZON_SYNC_RESOURCES,
+  EBAY_SYNC_RESOURCES,
   ETSY_SYNC_RESOURCES,
+  QUEUE_AMAZON_SYNC,
+  QUEUE_EBAY_SYNC,
   QUEUE_ETSY_SYNC,
   QUEUE_SHOPIFY_SYNC,
   QUEUE_WEBHOOKS,
   SHOPIFY_SYNC_RESOURCES,
+  type AmazonSyncJob,
+  type EbaySyncJob,
   type EtsySyncJob,
   type ShopifySyncJob,
   type SyncStatusValue,
@@ -92,6 +98,62 @@ export class SyncService {
         name: `etsy-backfill:${resource}`,
         queueName: QUEUE_ETSY_SYNC,
         data: { ...args, resource } satisfies EtsySyncJob,
+        opts: FLOW_JOB_OPTS,
+      })),
+    });
+  }
+
+  /**
+   * eBay ilk tam içe-aktarımı veya polling artımlı senkronu (inventory/orders/buyers) +
+   * sonrasına metrics-rollup zinciri (Etsy ile aynı FlowProducer deseni). `since` verilirse
+   * orders artımlı çekilir (polling watermark).
+   */
+  async enqueueEbayBackfill(args: {
+    connectionId: string;
+    storeId: string;
+    shopId: string;
+    since?: string;
+  }): Promise<void> {
+    for (const resource of EBAY_SYNC_RESOURCES) {
+      await this.setSyncState(args.connectionId, resource, "queued");
+    }
+    await this.flow.add({
+      name: "rollup-after-ebay-backfill",
+      queueName: QUEUE_METRICS_ROLLUP,
+      data: { storeId: args.storeId } satisfies MetricsRollupJob,
+      opts: FLOW_JOB_OPTS,
+      children: EBAY_SYNC_RESOURCES.map((resource) => ({
+        name: `ebay-backfill:${resource}`,
+        queueName: QUEUE_EBAY_SYNC,
+        data: { ...args, resource } satisfies EbaySyncJob,
+        opts: FLOW_JOB_OPTS,
+      })),
+    });
+  }
+
+  /**
+   * Amazon ilk tam içe-aktarımı veya polling artımlı senkronu (listings/orders/buyers) +
+   * sonrasına metrics-rollup zinciri (eBay ile aynı FlowProducer deseni). `since` verilirse
+   * orders artımlı çekilir (polling watermark).
+   */
+  async enqueueAmazonBackfill(args: {
+    connectionId: string;
+    storeId: string;
+    shopId: string;
+    since?: string;
+  }): Promise<void> {
+    for (const resource of AMAZON_SYNC_RESOURCES) {
+      await this.setSyncState(args.connectionId, resource, "queued");
+    }
+    await this.flow.add({
+      name: "rollup-after-amazon-backfill",
+      queueName: QUEUE_METRICS_ROLLUP,
+      data: { storeId: args.storeId } satisfies MetricsRollupJob,
+      opts: FLOW_JOB_OPTS,
+      children: AMAZON_SYNC_RESOURCES.map((resource) => ({
+        name: `amazon-backfill:${resource}`,
+        queueName: QUEUE_AMAZON_SYNC,
+        data: { ...args, resource } satisfies AmazonSyncJob,
         opts: FLOW_JOB_OPTS,
       })),
     });

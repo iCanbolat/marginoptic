@@ -3,13 +3,15 @@ import { z } from "zod";
 export const INTEGRATION_PROVIDERS = [
   "shopify",
   "etsy",
+  "ebay",
+  "amazon",
   "meta_ads",
   "google_ads",
   "tiktok_ads",
 ] as const;
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
 
-export const SALES_CHANNELS = ["shopify", "etsy"] as const;
+export const SALES_CHANNELS = ["shopify", "etsy", "ebay", "amazon"] as const;
 export type SalesChannel = (typeof SALES_CHANNELS)[number];
 
 export const CONNECTION_STATUSES = [
@@ -43,6 +45,28 @@ export const etsyConnectSchema = z.object({
     .regex(/^[a-zA-Z0-9][a-zA-Z0-9 _-]*$/, "Harf, rakam, boşluk, tire/alt çizgi"),
 });
 export type EtsyConnectInput = z.infer<typeof etsyConnectSchema>;
+
+/** eBay bağlama: mağaza adı/etiketi (OAuth canlıda eBay'den çözülür; dev'de bu kullanılır). */
+export const ebayConnectSchema = z.object({
+  shop: z
+    .string()
+    .trim()
+    .min(2, "Mağaza adı en az 2 karakter")
+    .max(60)
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9 _-]*$/, "Harf, rakam, boşluk, tire/alt çizgi"),
+});
+export type EbayConnectInput = z.infer<typeof ebayConnectSchema>;
+
+/** Amazon bağlama: satıcı adı/etiketi (OAuth canlıda LWA'dan çözülür; dev'de bu kullanılır). */
+export const amazonConnectSchema = z.object({
+  shop: z
+    .string()
+    .trim()
+    .min(2, "Satıcı adı en az 2 karakter")
+    .max(60)
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9 _-]*$/, "Harf, rakam, boşluk, tire/alt çizgi"),
+});
+export type AmazonConnectInput = z.infer<typeof amazonConnectSchema>;
 
 // ---- response sözleşmeleri ----
 

@@ -49,6 +49,27 @@ export const envSchema = z.object({
   ETSY_API_SECRET: z.string().default(""),
   ETSY_SCOPES: z.string().default("transactions_r listings_r shops_r"),
 
+  // eBay (Faz 10) — OAuth2 authorization code, Sell API. Anahtar yoksa canlı OAuth
+  // kapalı; dev-connect (sentetik) yine çalışır. Tazelik zamanlanmış polling ile.
+  EBAY_CLIENT_ID: z.string().default(""),
+  EBAY_CLIENT_SECRET: z.string().default(""),
+  EBAY_SCOPES: z
+    .string()
+    .default(
+      "https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly",
+    ),
+  // "production" | "sandbox" — connector endpoint'lerini seçer.
+  EBAY_ENV: z.enum(["production", "sandbox"]).default("production"),
+
+  // Amazon (Faz 10) — Selling Partner API (SP-API), Login with Amazon (LWA). SP-API
+  // artık AWS SigV4 imzası istemez (yalnız LWA access token). Anahtar yoksa canlı OAuth
+  // kapalı; dev-connect (sentetik) yine çalışır.
+  AMAZON_LWA_CLIENT_ID: z.string().default(""),
+  AMAZON_LWA_CLIENT_SECRET: z.string().default(""),
+  AMAZON_SCOPES: z.string().default(""),
+  // SP-API bölgesi: na (Kuzey Amerika), eu (Avrupa), fe (Uzak Doğu).
+  AMAZON_REGION: z.enum(["na", "eu", "fe"]).default("na"),
+
   // Faturalandırma — creem.io (Faz 9). Anahtar boşsa **dev sentetik** mod
   // (gerçek HTTP yok; checkout/portal dev sayfasına döner, webhook yerine
   // POST /billing/dev-activate ile plan etkinleştirilir). Test ucu:

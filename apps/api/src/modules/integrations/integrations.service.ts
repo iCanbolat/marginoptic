@@ -31,11 +31,15 @@ import { SyncService } from "../sync/sync.service";
 import { BillingService } from "../billing/billing.service";
 import { ConnectorRegistry } from "./connector.registry";
 import { EtsyConnector } from "./etsy/etsy.connector";
+import { EbayConnector } from "./ebay/ebay.connector";
+import { AmazonConnector } from "./amazon/amazon.connector";
 import type { TokenSet } from "./connector.types";
 
 const PROVIDER_CATALOG: Omit<ProviderInfo, "connectable">[] = [
   { provider: "shopify", label: "Shopify", kind: "channel" },
   { provider: "etsy", label: "Etsy", kind: "channel" },
+  { provider: "ebay", label: "eBay", kind: "channel" },
+  { provider: "amazon", label: "Amazon", kind: "channel" },
   { provider: "meta_ads", label: "Meta Ads", kind: "ads" },
   { provider: "google_ads", label: "Google Ads", kind: "ads" },
   { provider: "tiktok_ads", label: "TikTok Ads", kind: "ads" },
@@ -68,6 +72,8 @@ export class IntegrationsService {
     private readonly sync: SyncService,
     private readonly billing: BillingService,
     private readonly etsy: EtsyConnector,
+    private readonly ebay: EbayConnector,
+    private readonly amazon: AmazonConnector,
   ) {}
 
   async overview(orgId: string): Promise<IntegrationsOverview> {
@@ -274,6 +280,164 @@ export class IntegrationsService {
     return `${this.config.getOrThrow<string>("APP_URL")}/api/integrations/etsy/callback`;
   }
 
+  // ---- eBay OAuth2 (Faz 10) ----
+
+  /** eBay OAuth başlat: state üret (Redis), authorize URL döndür. */
+  async startEbayInstall(orgId: string): Promise<string> {
+    if (!this.ebay.isConfigured()) {
+      throw new BadRequestException("eBay yapılandırılmamış (EBAY_CLIENT_ID)");
+    }
+    const state = randomBytes(16).toString("hex");
+    await this.redis.set(
+      `oauth:ebay:state:${state}`,
+      JSON.stringify({ orgId }),
+      "EX",
+      STATE_TTL_SECONDS,
+    );
+    return this.ebay.buildAuthUrl({
+      state,
+      redirectUri: this.ebayRedirectUri(),
+    });
+  }
+
+  /** eBay callback: state doğrula, token al, satıcı çöz, kaydet, backfill başlat. */
+  async completeEbayCallback(query: Record<string, string>): Promise<string> {
+    const raw = query.state
+      ? await this.redis.getdel(`oauth:ebay:state:${query.state}`)
+      : null;
+    if (!raw) throw new BadRequestException("Geçersiz veya süresi dolmuş state");
+    const { orgId } = JSON.parse(raw) as { orgId: string };
+    if (!query.code) throw new BadRequestException("Yetkilendirme kodu yok");
+
+    const tokens = await this.ebay.exchangeCode({
+      code: query.code,
+      redirectUri: this.ebayRedirectUri(),
+    });
+    const seller = await this.ebay.fetchSeller(tokens.accessToken);
+
+    const { storeId, connectionId } = await this.persistConnection(
+      orgId,
+      "ebay",
+      "ebay",
+      seller.sellerName,
+      { ...tokens, externalAccountId: seller.sellerId },
+    );
+    await this.sync.enqueueEbayBackfill({
+      connectionId,
+      storeId,
+      shopId: seller.sellerId,
+    });
+    return `${this.config.getOrThrow<string>("WEB_ORIGIN")}/integrations?connected=ebay`;
+  }
+
+  /** Dev-only: gerçek eBay olmadan bağlantı simülasyonu (sentetik pipeline). */
+  async devConnectEbay(
+    orgId: string,
+    shop: string,
+  ): Promise<{ storeId: string; connectionId: string }> {
+    if (this.config.get("NODE_ENV") === "production") {
+      throw new NotFoundException();
+    }
+    const tokens: TokenSet = {
+      accessToken: `dev_${randomBytes(12).toString("hex")}`,
+      externalAccountId: shop,
+      scopes: this.config.get<string>("EBAY_SCOPES") ?? null,
+    };
+    const { storeId, connectionId } = await this.persistConnection(
+      orgId,
+      "ebay",
+      "ebay",
+      shop,
+      tokens,
+    );
+    await this.sync.enqueueEbayBackfill({ connectionId, storeId, shopId: shop });
+    return { storeId, connectionId };
+  }
+
+  private ebayRedirectUri(): string {
+    return `${this.config.getOrThrow<string>("APP_URL")}/api/integrations/ebay/callback`;
+  }
+
+  // ---- Amazon SP-API / LWA (Faz 10) ----
+
+  /** Amazon OAuth başlat: state üret (Redis), Seller Central consent URL döndür. */
+  async startAmazonInstall(orgId: string): Promise<string> {
+    if (!this.amazon.isConfigured()) {
+      throw new BadRequestException("Amazon yapılandırılmamış (AMAZON_LWA_CLIENT_ID)");
+    }
+    const state = randomBytes(16).toString("hex");
+    await this.redis.set(
+      `oauth:amazon:state:${state}`,
+      JSON.stringify({ orgId }),
+      "EX",
+      STATE_TTL_SECONDS,
+    );
+    return this.amazon.buildAuthUrl({
+      state,
+      redirectUri: this.amazonRedirectUri(),
+    });
+  }
+
+  /** Amazon callback: state doğrula, token al, satıcı çöz, kaydet, backfill başlat. */
+  async completeAmazonCallback(query: Record<string, string>): Promise<string> {
+    const raw = query.state
+      ? await this.redis.getdel(`oauth:amazon:state:${query.state}`)
+      : null;
+    if (!raw) throw new BadRequestException("Geçersiz veya süresi dolmuş state");
+    const { orgId } = JSON.parse(raw) as { orgId: string };
+    // Amazon yetki kodunu `spapi_oauth_code` query parametresiyle döndürür.
+    const code = query.spapi_oauth_code ?? query.code;
+    if (!code) throw new BadRequestException("Yetkilendirme kodu yok");
+
+    const tokens = await this.amazon.exchangeCode({
+      code,
+      redirectUri: this.amazonRedirectUri(),
+    });
+    const seller = await this.amazon.fetchSeller(tokens.accessToken);
+
+    const { storeId, connectionId } = await this.persistConnection(
+      orgId,
+      "amazon",
+      "amazon",
+      seller.sellerName,
+      { ...tokens, externalAccountId: seller.sellerId },
+    );
+    await this.sync.enqueueAmazonBackfill({
+      connectionId,
+      storeId,
+      shopId: seller.sellerId,
+    });
+    return `${this.config.getOrThrow<string>("WEB_ORIGIN")}/integrations?connected=amazon`;
+  }
+
+  /** Dev-only: gerçek Amazon olmadan bağlantı simülasyonu (sentetik pipeline). */
+  async devConnectAmazon(
+    orgId: string,
+    shop: string,
+  ): Promise<{ storeId: string; connectionId: string }> {
+    if (this.config.get("NODE_ENV") === "production") {
+      throw new NotFoundException();
+    }
+    const tokens: TokenSet = {
+      accessToken: `dev_${randomBytes(12).toString("hex")}`,
+      externalAccountId: shop,
+      scopes: this.config.get<string>("AMAZON_SCOPES") ?? null,
+    };
+    const { storeId, connectionId } = await this.persistConnection(
+      orgId,
+      "amazon",
+      "amazon",
+      shop,
+      tokens,
+    );
+    await this.sync.enqueueAmazonBackfill({ connectionId, storeId, shopId: shop });
+    return { storeId, connectionId };
+  }
+
+  private amazonRedirectUri(): string {
+    return `${this.config.getOrThrow<string>("APP_URL")}/api/integrations/amazon/callback`;
+  }
+
   // ---- Reklam hesabı bağlama (Faz 6) ----
 
   private isAdProvider(provider: IntegrationProvider): provider is AdProvider {
@@ -285,6 +449,14 @@ export class IntegrationsService {
     // Etsy: canlı OAuth yapılandırıldıysa ya da non-prod (dev-connect mevcut).
     if (provider === "etsy") {
       return this.etsy.isConfigured() || this.config.get("NODE_ENV") !== "production";
+    }
+    // eBay: canlı OAuth yapılandırıldıysa ya da non-prod (dev-connect mevcut).
+    if (provider === "ebay") {
+      return this.ebay.isConfigured() || this.config.get("NODE_ENV") !== "production";
+    }
+    // Amazon: canlı OAuth yapılandırıldıysa ya da non-prod (dev-connect mevcut).
+    if (provider === "amazon") {
+      return this.amazon.isConfigured() || this.config.get("NODE_ENV") !== "production";
     }
     return this.registry.has(provider);
   }

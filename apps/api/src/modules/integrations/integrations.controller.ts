@@ -19,11 +19,15 @@ import {
   adConnectSchema,
   adInstallSchema,
   adProviderSchema,
+  amazonConnectSchema,
+  ebayConnectSchema,
   etsyConnectSchema,
   shopifyInstallSchema,
   type AdConnectInput,
   type AdInstallInput,
   type AdProvider,
+  type AmazonConnectInput,
+  type EbayConnectInput,
   type EtsyConnectInput,
   type IntegrationsOverview,
   type ShopifyInstallInput,
@@ -111,6 +115,70 @@ export class IntegrationsController {
     @Body(new ZodValidationPipe(etsyConnectSchema)) dto: EtsyConnectInput,
   ): Promise<{ storeId: string; connectionId: string }> {
     return this.integrations.devConnectEtsy(org.id, dto.shop);
+  }
+
+  // ---- eBay (Faz 10) ----
+
+  @ApiBearerAuth()
+  @Roles("owner", "admin")
+  @Get("ebay/install")
+  async ebayInstall(
+    @CurrentOrg() org: ActiveOrg,
+  ): Promise<ShopifyInstallResponse> {
+    return { url: await this.integrations.startEbayInstall(org.id) };
+  }
+
+  /** eBay, kullanıcının tarayıcısını buraya yönlendirir (state ile). */
+  @Public()
+  @Get("ebay/callback")
+  async ebayCallback(
+    @Query() query: Record<string, string>,
+    @Res() res: Response,
+  ): Promise<void> {
+    res.redirect(await this.integrations.completeEbayCallback(query));
+  }
+
+  /** Dev-only: gerçek eBay olmadan bağlantı simülasyonu. */
+  @ApiBearerAuth()
+  @Roles("owner", "admin")
+  @Post("ebay/dev-connect")
+  ebayDevConnect(
+    @CurrentOrg() org: ActiveOrg,
+    @Body(new ZodValidationPipe(ebayConnectSchema)) dto: EbayConnectInput,
+  ): Promise<{ storeId: string; connectionId: string }> {
+    return this.integrations.devConnectEbay(org.id, dto.shop);
+  }
+
+  // ---- Amazon (Faz 10) ----
+
+  @ApiBearerAuth()
+  @Roles("owner", "admin")
+  @Get("amazon/install")
+  async amazonInstall(
+    @CurrentOrg() org: ActiveOrg,
+  ): Promise<ShopifyInstallResponse> {
+    return { url: await this.integrations.startAmazonInstall(org.id) };
+  }
+
+  /** Amazon, kullanıcının tarayıcısını buraya yönlendirir (state + spapi_oauth_code ile). */
+  @Public()
+  @Get("amazon/callback")
+  async amazonCallback(
+    @Query() query: Record<string, string>,
+    @Res() res: Response,
+  ): Promise<void> {
+    res.redirect(await this.integrations.completeAmazonCallback(query));
+  }
+
+  /** Dev-only: gerçek Amazon olmadan bağlantı simülasyonu. */
+  @ApiBearerAuth()
+  @Roles("owner", "admin")
+  @Post("amazon/dev-connect")
+  amazonDevConnect(
+    @CurrentOrg() org: ActiveOrg,
+    @Body(new ZodValidationPipe(amazonConnectSchema)) dto: AmazonConnectInput,
+  ): Promise<{ storeId: string; connectionId: string }> {
+    return this.integrations.devConnectAmazon(org.id, dto.shop);
   }
 
   @Public()

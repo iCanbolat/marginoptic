@@ -34,6 +34,18 @@ export const integrationApi = {
   etsyDevConnect: (shop: string) =>
     apiPost<ConnectResult>("/integrations/etsy/dev-connect", { shop }),
 
+  // eBay
+  ebayInstall: () =>
+    apiGet<ShopifyInstallResponse>("/integrations/ebay/install"),
+  ebayDevConnect: (shop: string) =>
+    apiPost<ConnectResult>("/integrations/ebay/dev-connect", { shop }),
+
+  // Amazon
+  amazonInstall: () =>
+    apiGet<ShopifyInstallResponse>("/integrations/amazon/install"),
+  amazonDevConnect: (shop: string) =>
+    apiPost<ConnectResult>("/integrations/amazon/dev-connect", { shop }),
+
   // Reklam sağlayıcıları
   adInstall: (provider: AdProvider, storeId: string) =>
     apiGet<ShopifyInstallResponse>(`/integrations/ads/${provider}/install`, {

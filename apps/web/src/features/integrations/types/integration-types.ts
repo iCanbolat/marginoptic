@@ -1,4 +1,6 @@
 import {
+  AmazonIcon,
+  AuctionIcon,
   GoogleIcon,
   MetaIcon,
   ShoppingBag01Icon,
@@ -31,6 +33,8 @@ export interface ProviderMeta {
 export const PROVIDER_META: Record<IntegrationProvider, ProviderMeta> = {
   shopify: { label: "Shopify", icon: ShoppingBag01Icon },
   etsy: { label: "Etsy", icon: Store01Icon },
+  ebay: { label: "eBay", icon: AuctionIcon },
+  amazon: { label: "Amazon", icon: AmazonIcon },
   meta_ads: { label: "Meta Ads", icon: MetaIcon },
   google_ads: { label: "Google Ads", icon: GoogleIcon },
   tiktok_ads: { label: "TikTok Ads", icon: TiktokIcon },

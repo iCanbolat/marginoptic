@@ -11,11 +11,18 @@ import {
 } from "drizzle-orm/pg-core";
 import { organizations } from "./auth";
 
-export const salesChannel = pgEnum("sales_channel", ["shopify", "etsy"]);
+export const salesChannel = pgEnum("sales_channel", [
+  "shopify",
+  "etsy",
+  "ebay",
+  "amazon",
+]);
 
 export const integrationProvider = pgEnum("integration_provider", [
   "shopify",
   "etsy",
+  "ebay",
+  "amazon",
   "meta_ads",
   "google_ads",
   "tiktok_ads",
