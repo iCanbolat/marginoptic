@@ -15,23 +15,39 @@ const f4 = (n: number): string => n.toFixed(4);
 
 const CUSTOMER_COUNT = 2119;
 const REPEAT_RATE = 5.57; // %
-const RETURNING = Math.round((CUSTOMER_COUNT * REPEAT_RATE) / 100); // ~118
-const NEW_CUSTOMERS = CUSTOMER_COUNT - RETURNING;
 const LTV = 50.06; // müşteri başı ortalama ciro (LTV vekili)
 const CAC = 24.47;
 
+/**
+ * Tarihe bağlı deterministik sezon çarpanı. Yıl başı (1 Oca) → 1.0 olduğundan
+ * varsayılan görünümdeki tasarım sayıları aynen korunur; başka dönemlerde ±~%8
+ * sapma üretir, böylece "karşılaştır" açıkken önceki döneme göre trend görünür.
+ */
+function seasonFactor(from: string, phase = 0): number {
+  const d = new Date(`${from}T00:00:00.000Z`);
+  const dayOfYear = Math.floor(
+    (d.getTime() - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86_400_000,
+  );
+  return 1 + Math.sin(dayOfYear + phase) * 0.08;
+}
+
 export function mockLtv(range: { from: string; to: string }): CustomerLtvResponse {
+  const factor = seasonFactor(range.from);
+  const customerCount = Math.round(CUSTOMER_COUNT * factor);
+  const returning = Math.round((customerCount * REPEAT_RATE) / 100);
+  const newCustomers = customerCount - returning;
+  const ltv = LTV * factor;
   return {
     from: range.from,
     to: range.to,
     currency: CURRENCY,
-    customerCount: CUSTOMER_COUNT,
-    newCustomers: NEW_CUSTOMERS,
-    returningCustomers: RETURNING,
-    repeatRate: REPEAT_RATE,
-    avgOrderValue: f4(47.5),
+    customerCount,
+    newCustomers,
+    returningCustomers: returning,
+    repeatRate: REPEAT_RATE * seasonFactor(range.from, 1),
+    avgOrderValue: f4(47.5 * factor),
     avgOrdersPerCustomer: 1.06,
-    avgRevenuePerCustomer: f4(LTV),
+    avgRevenuePerCustomer: f4(ltv),
     topCustomers: Array.from({ length: 5 }, (_, i) => ({
       storeId: "00000000-0000-4000-8000-000000000001",
       customerExternalId: String(9100 + i),
@@ -43,13 +59,17 @@ export function mockLtv(range: { from: string; to: string }): CustomerLtvRespons
 }
 
 export function mockCac(range: { from: string; to: string }): CustomerCacResponse {
+  const customerCount = Math.round(CUSTOMER_COUNT * seasonFactor(range.from));
+  const newCustomers =
+    customerCount - Math.round((customerCount * REPEAT_RATE) / 100);
+  const cac = CAC * seasonFactor(range.from, 2);
   return {
     from: range.from,
     to: range.to,
     currency: CURRENCY,
-    adSpend: f4(CAC * NEW_CUSTOMERS),
-    newCustomers: NEW_CUSTOMERS,
-    cac: f4(CAC),
+    adSpend: f4(cac * newCustomers),
+    newCustomers,
+    cac: f4(cac),
   };
 }
 

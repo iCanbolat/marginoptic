@@ -2,12 +2,16 @@ import { InjectQueue, Processor, WorkerHost } from "@nestjs/bullmq";
 import { Inject, Logger, type OnApplicationBootstrap } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { Queue, type Job } from "bullmq";
-import type { AdProvider } from "@churnify/shared";
+import { PRODUCT_LEVEL_AD_PROVIDERS, type AdProvider } from "@churnify/shared";
 import { CryptoService } from "../../../common/crypto/crypto.service";
 import { DRIZZLE, type DrizzleDB } from "../../../database/database.module";
+import { productProfitDaily } from "../../../database/schema/metrics";
 import { integrationConnections } from "../../../database/schema/stores";
 import { AdConnectorRegistry } from "../../integrations/ads/ad-connector.registry";
-import { generateSyntheticAds } from "../../integrations/ads/ads-synthetic";
+import {
+  generateSyntheticAds,
+  generateSyntheticProductAds,
+} from "../../integrations/ads/ads-synthetic";
 import { SyncService } from "../../sync/sync.service";
 import { AdsIngestionService } from "../ads-ingestion.service";
 import { AdsSyncService } from "../ads-sync.service";
@@ -92,7 +96,8 @@ export class AdsSyncProcessor
 
     try {
       const accessToken = this.crypto.decrypt(conn.accessTokenEnc);
-      const result = accessToken.startsWith("dev_")
+      const isDev = accessToken.startsWith("dev_");
+      const result = isDev
         ? generateSyntheticAds(account)
         : await this.registry.get(prov).fetchInsights({
             accessToken,
@@ -100,6 +105,16 @@ export class AdsSyncProcessor
             since: since ?? "",
             until: until ?? "",
           });
+
+      // Dev + ürün-raporlu sağlayıcı: gerçek ürün dış kimlikleri üzerinden
+      // sentetik ürün-seviyesi harcama üret (canlı connector zaten productSpend döner).
+      if (
+        isDev &&
+        (PRODUCT_LEVEL_AD_PROVIDERS as readonly string[]).includes(prov)
+      ) {
+        const productIds = await this.storeProductExternalIds(effectiveStoreId);
+        result.productSpend = generateSyntheticProductAds(account, productIds);
+      }
 
       const counts = await this.ingestion.upsertInsights(
         effectiveStoreId,
@@ -117,7 +132,7 @@ export class AdsSyncProcessor
       // Reklam harcaması metriklere katılsın → mağazayı tam yeniden hesapla.
       await this.sync.enqueueMetricsRollup(effectiveStoreId);
       this.logger.log(
-        `Reklam senkron ${prov} ${account}: ${counts.entities} varlık / ${counts.spend} harcama satırı`,
+        `Reklam senkron ${prov} ${account}: ${counts.entities} varlık / ${counts.spend} harcama / ${counts.productSpend} ürün-harcama satırı`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -126,5 +141,20 @@ export class AdsSyncProcessor
       });
       throw err;
     }
+  }
+
+  /**
+   * Bir mağazanın atıf için kullanılabilir ürün dış kimlikleri (en çok 8).
+   * product_profit_daily join hedefiyle birebir eşleşir (rollup satış senkronundan
+   * önce çalıştıysa boş dönebilir → sentetik ürün-harcama boş kalır, blended fallback).
+   */
+  private async storeProductExternalIds(storeId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ id: productProfitDaily.productExternalId })
+      .from(productProfitDaily)
+      .where(eq(productProfitDaily.storeId, storeId))
+      .orderBy(productProfitDaily.productExternalId)
+      .limit(8);
+    return rows.map((r) => r.id).filter((id) => id && id !== "unknown");
   }
 }

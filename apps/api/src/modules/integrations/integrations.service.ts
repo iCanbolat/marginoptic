@@ -17,6 +17,8 @@ import {
   type IntegrationsOverview,
   type ProviderInfo,
   type SalesChannel,
+  type SyncAllResult,
+  type SyncAllStatus,
 } from "@churnify/shared";
 import { CryptoService } from "../../common/crypto/crypto.service";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
@@ -28,6 +30,7 @@ import {
 import { AdConnectorRegistry } from "./ads/ad-connector.registry";
 import { AdsSyncService } from "../ads/ads-sync.service";
 import { SyncService } from "../sync/sync.service";
+import { ProductTrafficService } from "../tracking/product-traffic.service";
 import { BillingService } from "../billing/billing.service";
 import { ConnectorRegistry } from "./connector.registry";
 import { EtsyConnector } from "./etsy/etsy.connector";
@@ -43,9 +46,15 @@ const PROVIDER_CATALOG: Omit<ProviderInfo, "connectable">[] = [
   { provider: "meta_ads", label: "Meta Ads", kind: "ads" },
   { provider: "google_ads", label: "Google Ads", kind: "ads" },
   { provider: "tiktok_ads", label: "TikTok Ads", kind: "ads" },
+  { provider: "amazon_ads", label: "Amazon Ads", kind: "ads" },
+  { provider: "ebay_ads", label: "eBay Marketing", kind: "ads" },
 ];
 
 const STATE_TTL_SECONDS = 600;
+
+/** Tüm sağlayıcılardan tek-buton senkron cooldown'ı (15 dk). */
+const SYNC_ALL_COOLDOWN_SECONDS = 900;
+const syncAllCooldownKey = (orgId: string) => `sync:all:cooldown:${orgId}`;
 
 interface OAuthState {
   orgId: string;
@@ -70,6 +79,7 @@ export class IntegrationsService {
     private readonly adRegistry: AdConnectorRegistry,
     private readonly adsSync: AdsSyncService,
     private readonly sync: SyncService,
+    private readonly traffic: ProductTrafficService,
     private readonly billing: BillingService,
     private readonly etsy: EtsyConnector,
     private readonly ebay: EbayConnector,
@@ -666,6 +676,133 @@ export class IntegrationsService {
         .set({ status: "disconnected", updatedAt: new Date() })
         .where(eq(stores.id, conn.storeId));
     }
+  }
+
+  // ---- Tüm sağlayıcılardan tek-buton senkron (+ cooldown) ----
+
+  /** Cooldown durumu (sayfa ilk yüklemede butonu doğru göstermek için). */
+  async syncAllStatus(orgId: string): Promise<SyncAllStatus> {
+    const ttl = await this.redis.ttl(syncAllCooldownKey(orgId));
+    if (ttl > 0) {
+      return {
+        onCooldown: true,
+        nextAvailableAt: new Date(Date.now() + ttl * 1000).toISOString(),
+        cooldownSeconds: SYNC_ALL_COOLDOWN_SECONDS,
+      };
+    }
+    return {
+      onCooldown: false,
+      nextAvailableAt: null,
+      cooldownSeconds: SYNC_ALL_COOLDOWN_SECONDS,
+    };
+  }
+
+  /**
+   * Org'un tüm aktif bağlantılarını senkronlar: satış kanalları (backfill +
+   * rollup zinciri), reklam hesapları (ads backfill) ve marketplace traffic.
+   * 15 dk cooldown uygulanır; cooldown aktifse iş kuyruğa alınmaz (triggered=false).
+   */
+  async syncAllForOrg(orgId: string): Promise<SyncAllResult> {
+    const key = syncAllCooldownKey(orgId);
+    const ttl = await this.redis.ttl(key);
+    if (ttl > 0) {
+      return {
+        triggered: false,
+        nextAvailableAt: new Date(Date.now() + ttl * 1000).toISOString(),
+        cooldownSeconds: SYNC_ALL_COOLDOWN_SECONDS,
+        queued: { salesConnections: 0, adConnections: 0, trafficStores: 0 },
+      };
+    }
+
+    const conns = await this.db
+      .select({
+        id: integrationConnections.id,
+        provider: integrationConnections.provider,
+        storeId: integrationConnections.storeId,
+        externalAccountId: integrationConnections.externalAccountId,
+      })
+      .from(integrationConnections)
+      .where(
+        and(
+          eq(integrationConnections.organizationId, orgId),
+          eq(integrationConnections.status, "active"),
+        ),
+      );
+
+    let salesConnections = 0;
+    let adConnections = 0;
+    const marketplaceStores = new Set<string>();
+
+    for (const c of conns) {
+      if (!c.storeId) continue;
+      const account = c.externalAccountId ?? "";
+      if (this.isAdProvider(c.provider)) {
+        await this.adsSync.enqueueBackfill({
+          connectionId: c.id,
+          storeId: c.storeId,
+          provider: c.provider,
+          externalAccountId: account,
+        });
+        adConnections += 1;
+        continue;
+      }
+      switch (c.provider) {
+        case "shopify":
+          await this.sync.enqueueShopifyBackfill({
+            connectionId: c.id,
+            storeId: c.storeId,
+            shop: account,
+          });
+          break;
+        case "etsy":
+          await this.sync.enqueueEtsyBackfill({
+            connectionId: c.id,
+            storeId: c.storeId,
+            shopId: account,
+          });
+          break;
+        case "ebay":
+          await this.sync.enqueueEbayBackfill({
+            connectionId: c.id,
+            storeId: c.storeId,
+            shopId: account,
+          });
+          marketplaceStores.add(c.storeId);
+          break;
+        case "amazon":
+          await this.sync.enqueueAmazonBackfill({
+            connectionId: c.id,
+            storeId: c.storeId,
+            shopId: account,
+          });
+          marketplaceStores.add(c.storeId);
+          break;
+        default:
+          continue;
+      }
+      salesConnections += 1;
+    }
+
+    // Marketplace (Amazon/eBay) ürün-traffic'ini yenile (conversion kartı için).
+    for (const storeId of marketplaceStores) {
+      await this.traffic.syncMarketplaceTraffic(storeId);
+    }
+
+    // Cooldown'ı ayarla (15 dk).
+    await this.redis.set(key, new Date().toISOString(), "EX", SYNC_ALL_COOLDOWN_SECONDS);
+
+    return {
+      triggered: true,
+      nextAvailableAt: new Date(
+        Date.now() + SYNC_ALL_COOLDOWN_SECONDS * 1000,
+      ).toISOString(),
+      cooldownSeconds: SYNC_ALL_COOLDOWN_SECONDS,
+      queued: {
+        salesConnections,
+        adConnections,
+        trafficStores: marketplaceStores.size,
+      },
+    };
   }
 
   private shopifyRedirectUri(): string {

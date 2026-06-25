@@ -26,6 +26,8 @@ export const integrationProvider = pgEnum("integration_provider", [
   "meta_ads",
   "google_ads",
   "tiktok_ads",
+  "amazon_ads",
+  "ebay_ads",
 ]);
 
 export const connectionStatus = pgEnum("connection_status", [
@@ -59,6 +61,9 @@ export const stores = pgTable(
     currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     timezone: varchar("timezone", { length: 64 }).notNull().default("UTC"),
     status: connectionStatus("status").notNull().default("active"),
+    // Storefront dönüşüm beacon'u (Shopify snippet) için public yazma anahtarı.
+    // Mağaza oluşturulurken üretilir; snippet'e gömülür, /track ucunda doğrulanır.
+    trackingKey: varchar("tracking_key", { length: 128 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

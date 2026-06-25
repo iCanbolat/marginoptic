@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   AD_LEVELS,
   analyticsFilterSchema,
+  productTableQuerySchema,
   type AdLevel,
   type AdsPerformanceResponse,
   type AnalyticsFilter,
@@ -10,7 +11,10 @@ import {
   type CustomerCohortsResponse,
   type CustomerLtvResponse,
   type PnlResponse,
+  type ProductOverviewResponse,
   type ProductRankingResponse,
+  type ProductTableQuery,
+  type ProductTableResponse,
   type ProfitSummaryResponse,
   type StoreComparisonResponse,
   type TimeseriesResponse,
@@ -22,8 +26,10 @@ import {
 } from "../auth/decorators/current-org.decorator";
 import { AnalyticsService } from "./analytics.service";
 import { CustomersService } from "./customers.service";
+import { ProductAnalyticsService } from "./product-analytics.service";
 
 const filterPipe = new ZodValidationPipe(analyticsFilterSchema);
+const productTablePipe = new ZodValidationPipe(productTableQuerySchema);
 
 function clampLimit(raw: string | undefined): number {
   const n = Number(raw);
@@ -48,6 +54,7 @@ export class AnalyticsController {
   constructor(
     private readonly analytics: AnalyticsService,
     private readonly customers: CustomersService,
+    private readonly productAnalytics: ProductAnalyticsService,
   ) {}
 
   @Get("profit-summary")
@@ -98,6 +105,24 @@ export class AnalyticsController {
     @Query("level") level?: string,
   ): Promise<AdsPerformanceResponse> {
     return this.analytics.adsPerformance(org.id, filter, parseLevel(level));
+  }
+
+  /** Ürün Analizi overview: 3 platform (Etsy hariç) → 4 kart. */
+  @Get("product-overview")
+  productOverview(
+    @CurrentOrg() org: ActiveOrg,
+    @Query(filterPipe) filter: AnalyticsFilter,
+  ): Promise<ProductOverviewResponse> {
+    return this.productAnalytics.overview(org.id, filter);
+  }
+
+  /** Ürün tablosu: ürün-bazlı ROAS / reklam harcaması / dönüşüm (sayfalı). */
+  @Get("product-table")
+  productTable(
+    @CurrentOrg() org: ActiveOrg,
+    @Query(productTablePipe) query: ProductTableQuery,
+  ): Promise<ProductTableResponse> {
+    return this.productAnalytics.table(org.id, query);
   }
 
   @Get("customers/ltv")

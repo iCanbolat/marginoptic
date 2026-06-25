@@ -23,3 +23,5 @@ pnpm-debug.log*
 
 # generated
 apps/web/src/routeTree.gen.ts
+
+marginoptic-cvr-webpixel

@@ -1,8 +1,13 @@
 import { ConfigService } from "@nestjs/config";
+import { AmazonAdsConnector } from "./amazon-ads.connector";
+import { EbayMarketingConnector } from "./ebay-marketing.connector";
 import { GoogleAdsConnector } from "./google.connector";
 import { MetaConnector } from "./meta.connector";
 import { TikTokAdsConnector } from "./tiktok.connector";
-import { generateSyntheticAds } from "./ads-synthetic";
+import {
+  generateSyntheticAds,
+  generateSyntheticProductAds,
+} from "./ads-synthetic";
 
 function configWith(values: Record<string, string>): ConfigService {
   return {
@@ -55,6 +60,31 @@ describe("ad connectors — buildAuthUrl", () => {
       ).isConfigured(),
     ).toBe(true);
   });
+
+  it("Amazon Ads authorize URL LWA + advertising scope", () => {
+    const c = new AmazonAdsConnector(
+      configWith({ AMAZON_ADS_CLIENT_ID: "amzn1" }),
+    );
+    const url = new URL(
+      c.buildAuthUrl({ state: "s4", redirectUri: "https://x/cb" }),
+    );
+    expect(url.hostname).toBe("www.amazon.com");
+    expect(url.searchParams.get("client_id")).toBe("amzn1");
+    expect(url.searchParams.get("scope")).toContain("advertising");
+    expect(c.provider).toBe("amazon_ads");
+  });
+
+  it("eBay Marketing authorize URL marketing scope", () => {
+    const c = new EbayMarketingConnector(
+      configWith({ EBAY_ADS_CLIENT_ID: "ebay1" }),
+    );
+    const url = new URL(
+      c.buildAuthUrl({ state: "s5", redirectUri: "https://x/cb" }),
+    );
+    expect(url.hostname).toBe("auth.ebay.com");
+    expect(url.searchParams.get("scope")).toContain("marketing");
+    expect(c.provider).toBe("ebay_ads");
+  });
 });
 
 describe("generateSyntheticAds", () => {
@@ -84,5 +114,37 @@ describe("generateSyntheticAds", () => {
     expect(byLevel("campaign")).toBe(2);
     expect(byLevel("adset")).toBe(4);
     expect(byLevel("ad")).toBe(8);
+  });
+});
+
+describe("generateSyntheticProductAds", () => {
+  it("ürün yoksa boş dizi (blended fallback)", () => {
+    expect(generateSyntheticProductAds("act_demo", [])).toEqual([]);
+  });
+
+  it("ürün-harcama toplamı = kampanya-harcama toplamı (atıf korunur)", () => {
+    const ids = ["p1", "p2", "p3"];
+    const product = generateSyntheticProductAds("act_demo", ids);
+    const { spend } = generateSyntheticAds("act_demo");
+    const sumProduct =
+      Math.round(
+        product.reduce((acc, r) => acc + Number(r.spend), 0) * 1e2,
+      ) / 1e2;
+    const sumCampaign =
+      Math.round(
+        spend
+          .filter((r) => r.level === "campaign")
+          .reduce((acc, r) => acc + Number(r.spend), 0) * 1e2,
+      ) / 1e2;
+    expect(sumProduct).toBe(sumCampaign);
+  });
+
+  it("deterministik + her ürün için satır üretir", () => {
+    const a = generateSyntheticProductAds("act_x", ["p1", "p2"]);
+    const b = generateSyntheticProductAds("act_x", ["p1", "p2"]);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(new Set(a.map((r) => r.productExternalId))).toEqual(
+      new Set(["p1", "p2"]),
+    );
   });
 });

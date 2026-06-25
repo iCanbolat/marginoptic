@@ -2,6 +2,8 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { AdConnectorRegistry } from "../integrations/ads/ad-connector.registry";
 import { AD_CONNECTORS } from "../integrations/ads/ad-connector.types";
+import { AmazonAdsConnector } from "../integrations/ads/amazon-ads.connector";
+import { EbayMarketingConnector } from "../integrations/ads/ebay-marketing.connector";
 import { GoogleAdsConnector } from "../integrations/ads/google.connector";
 import { MetaConnector } from "../integrations/ads/meta.connector";
 import { TikTokAdsConnector } from "../integrations/ads/tiktok.connector";
@@ -26,14 +28,24 @@ import { QUEUE_ADS_SYNC } from "./ads.constants";
     MetaConnector,
     GoogleAdsConnector,
     TikTokAdsConnector,
+    AmazonAdsConnector,
+    EbayMarketingConnector,
     {
       provide: AD_CONNECTORS,
       useFactory: (
         meta: MetaConnector,
         google: GoogleAdsConnector,
         tiktok: TikTokAdsConnector,
-      ) => [meta, google, tiktok],
-      inject: [MetaConnector, GoogleAdsConnector, TikTokAdsConnector],
+        amazon: AmazonAdsConnector,
+        ebay: EbayMarketingConnector,
+      ) => [meta, google, tiktok, amazon, ebay],
+      inject: [
+        MetaConnector,
+        GoogleAdsConnector,
+        TikTokAdsConnector,
+        AmazonAdsConnector,
+        EbayMarketingConnector,
+      ],
     },
     AdConnectorRegistry,
     AdsIngestionService,

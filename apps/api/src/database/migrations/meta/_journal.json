@@ -71,6 +71,13 @@
       "when": 1782313815565,
       "tag": "0009_lean_vengeance",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782343696722,
+      "tag": "0010_concerned_hiroim",
+      "breakpoints": true
     }
   ]
 }

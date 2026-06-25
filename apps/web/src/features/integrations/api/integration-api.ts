@@ -4,6 +4,7 @@ import type {
   IntegrationsOverview,
   ShopifyInstallResponse,
   StoreSummary,
+  StoreTrackingInfo,
 } from "@churnify/shared";
 import { apiDelete, apiGet, apiPost } from "@/lib/api-client";
 
@@ -63,4 +64,8 @@ export const integrationApi = {
 
   // Reklam hesabı bağlama formu için mağaza listesi.
   listStores: () => apiGet<StoreSummary[]>("/stores"),
+
+  // Dönüşüm izleme (Web Pixel Account ID) — Shopify mağazası bazında.
+  storeTracking: (storeId: string) =>
+    apiGet<StoreTrackingInfo>(`/stores/${storeId}/tracking`),
 };

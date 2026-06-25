@@ -2,6 +2,7 @@ import type {
   AdEntityRow,
   AdInsightsResult,
   AdSpendRow,
+  ProductAdSpendRow,
 } from "./ad-connector.types";
 
 /**
@@ -147,6 +148,53 @@ export function generateSyntheticAds(account: string): AdInsightsResult {
   }
 
   return { entities, spend };
+}
+
+/**
+ * Ürün-seviyesi sentetik harcama: günlük kampanya toplamını verilen gerçek ürün
+ * dış kimlikleri arasında deterministik ağırlıkla dağıtır. `productExternalIds`
+ * product_profit_daily ile join olacak gerçek değerler olmalı; boşsa [] döner
+ * (atıf blended fallback'e düşer). Amazon Ads / eBay Promoted Listings gibi
+ * ürün-raporlu sağlayıcıları taklit eder.
+ */
+export function generateSyntheticProductAds(
+  account: string,
+  productExternalIds: string[],
+): ProductAdSpendRow[] {
+  if (productExternalIds.length === 0) return [];
+  const start = windowStart();
+  // En çok 8 ürüne dağıt (gürültüyü sınırlamak için).
+  const ids = productExternalIds.slice(0, 8);
+  const totalWeight = ids.reduce((acc, _id, i) => acc + (i + 1), 0);
+  const rows: ProductAdSpendRow[] = [];
+
+  for (let di = 0; di < WINDOW_DAYS; di++) {
+    const date = dayIso(start, di);
+    // Günlük toplam harcama = tüm ad'ların toplamı (campaign toplamıyla aynı taban).
+    let dayTotal = 0;
+    let dayClicks = 0;
+    let dayConv = 0;
+    let dayConvValue = 0;
+    for (let a = 0; a < AD_COUNT; a++) {
+      const l = leaf(a, di);
+      dayTotal += l.spend;
+      dayClicks += l.clicks;
+      dayConv += l.conversions;
+      dayConvValue += l.conversionValue;
+    }
+    ids.forEach((id, i) => {
+      const share = (i + 1) / totalWeight;
+      rows.push({
+        date,
+        productExternalId: id,
+        spend: r4(dayTotal * share),
+        clicks: Math.round(dayClicks * share),
+        conversions: r4(dayConv * share),
+        conversionValue: r4(dayConvValue * share),
+      });
+    });
+  }
+  return rows;
 }
 
 function row(

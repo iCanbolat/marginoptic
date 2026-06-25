@@ -4,4 +4,6 @@ export const integrationKeys = {
   overview: () => [...integrationKeys.all, "overview"] as const,
   // Mağaza listesi birden çok feature tarafından kullanılır; ortak anahtar.
   stores: () => ["stores"] as const,
+  tracking: (storeId: string) =>
+    [...integrationKeys.all, "tracking", storeId] as const,
 };

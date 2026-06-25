@@ -9,6 +9,7 @@ export * from "./sales";
 export * from "./costs";
 export * from "./metrics";
 export * from "./ads";
+export * from "./product-analytics";
 export * from "./dashboards";
 export * from "./mcp";
 export * from "./billing";

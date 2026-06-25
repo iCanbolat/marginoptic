@@ -45,9 +45,26 @@ export interface AdSpendRow {
   currency: string | null;
 }
 
+/**
+ * Ürün-seviyesi gün-bazlı harcama satırı. Amazon Ads (ASIN/SellerSKU), eBay
+ * Promoted Listings (listing id) ve Meta/Google katalog raporları doğrudan ürün
+ * kırılımı verir; `productExternalId` ürünün satış-kanalı dış kimliğiyle eşleşir
+ * (product_profit_daily ile join için).
+ */
+export interface ProductAdSpendRow {
+  date: string; // YYYY-MM-DD
+  productExternalId: string;
+  spend: string;
+  clicks: number;
+  conversions: string;
+  conversionValue: string;
+}
+
 export interface AdInsightsResult {
   entities: AdEntityRow[];
   spend: AdSpendRow[];
+  /** Ürün-seviyesi harcama (yalnız ürünü raporlayan sağlayıcılarda). */
+  productSpend?: ProductAdSpendRow[];
 }
 
 /** Tüm reklam sağlayıcılarının (Meta/Google/TikTok) OAuth + insight sözleşmesi. */

@@ -36,7 +36,6 @@ export function OrdersPage() {
   const [range, setRange] = useState<DateRangeValue>(() => ({
     from: startOfYearIso(),
     to: todayIso(),
-    compare: false,
   }));
 
   const analyticsFilter: AnalyticsFilterParams = useMemo(
@@ -44,7 +43,7 @@ export function OrdersPage() {
       from: range.from,
       to: range.to,
       storeIds: activeStoreId ? [activeStoreId] : [],
-      compare: range.compare,
+      compare: true,
     }),
     [range, activeStoreId],
   );

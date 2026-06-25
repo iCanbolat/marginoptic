@@ -38,6 +38,8 @@ export const PROVIDER_META: Record<IntegrationProvider, ProviderMeta> = {
   meta_ads: { label: "Meta Ads", icon: MetaIcon },
   google_ads: { label: "Google Ads", icon: GoogleIcon },
   tiktok_ads: { label: "TikTok Ads", icon: TiktokIcon },
+  amazon_ads: { label: "Amazon Ads", icon: AmazonIcon },
+  ebay_ads: { label: "eBay Marketing", icon: AuctionIcon },
 };
 
 /** Reklam sağlayıcı etiketleri (connect dialog select'i için). */
@@ -45,4 +47,6 @@ export const AD_LABELS: Record<AdProvider, string> = {
   meta_ads: "Meta Ads",
   google_ads: "Google Ads",
   tiktok_ads: "TikTok Ads",
+  amazon_ads: "Amazon Ads",
+  ebay_ads: "eBay Marketing",
 };

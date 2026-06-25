@@ -5,8 +5,26 @@ import { z } from "zod";
  * Para alanları DB'de `numeric` olduğundan yanıtta ondalık string döner.
  */
 
-export const AD_PROVIDERS = ["meta_ads", "google_ads", "tiktok_ads"] as const;
+export const AD_PROVIDERS = [
+  "meta_ads",
+  "google_ads",
+  "tiktok_ads",
+  "amazon_ads",
+  "ebay_ads",
+] as const;
 export type AdProvider = (typeof AD_PROVIDERS)[number];
+
+/**
+ * Ürünü doğrudan raporlayan (ürün-seviyesi atıf yapılabilen) reklam sağlayıcılar.
+ * Amazon Ads (ASIN/SKU) ve eBay Promoted Listings (listing id) raporları ürün
+ * kırılımı verir; Meta/Google katalog raporları da ürün-id taşır.
+ */
+export const PRODUCT_LEVEL_AD_PROVIDERS = [
+  "amazon_ads",
+  "ebay_ads",
+  "meta_ads",
+  "google_ads",
+] as const;
 
 export const AD_LEVELS = ["account", "campaign", "adset", "ad"] as const;
 export type AdLevel = (typeof AD_LEVELS)[number];

@@ -1,7 +1,7 @@
 import { InjectQueue } from "@nestjs/bullmq";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Queue } from "bullmq";
-import { and, asc, between, desc, eq, sql } from "drizzle-orm";
+import { and, asc, between, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Redis } from "ioredis";
 import type {
   DailyStoreMetric,
@@ -16,6 +16,10 @@ import {
   dailyStoreMetrics,
   productProfitDaily,
 } from "../../database/schema/metrics";
+import {
+  productAdLinks,
+  productAdSpendDaily,
+} from "../../database/schema/product-analytics";
 import { stores } from "../../database/schema/stores";
 import { REDIS } from "../../redis/redis.module";
 import { assertStoreInOrg } from "../costs/store-access";
@@ -172,14 +176,10 @@ export class MetricsService {
       bucket(a.date).adSpend += num(a.spend);
     }
 
-    // Ürün-seviyesi reklam atfı (ciro-payı): günün reklam harcamasını o günün
-    // ürünlerine ciro oranıyla dağıt; ürün net kârından düş.
-    for (const p of products.values()) {
-      const day = daily.get(p.date);
-      if (!day || day.adSpend <= 0 || day.revenue <= 0) continue;
-      p.attributedAdSpend = day.adSpend * (p.revenue / day.revenue);
-      p.net -= p.attributedAdSpend;
-    }
+    // Ürün-seviyesi reklam atfı: ürün-seviyesi raporlar (product_ad_spend_daily)
+    // + manuel eşleştirme allokasyonu (product_ad_links) öncelikli; artakalan
+    // (eşlenmemiş) günlük harcama eşlemesiz ürünlere ciro-payı ile dağıtılır.
+    await this.attributeProductAdSpend(storeId, range, products, daily);
 
     // Yaz (idempotent: aralığı/mağazayı temizle, yeniden ekle).
     await this.db.transaction(async (tx) => {
@@ -253,6 +253,136 @@ export class MetricsService {
       `Rollup mağaza=${storeId}${range ? ` ${range.from}→${range.to}` : " (tam)"}: ${daily.size} gün, ${products.size} ürün-gün`,
     );
     return daily.size;
+  }
+
+  /**
+   * Ürün-gün reklam atfını hesaplar (rollupStore içinden çağrılır, accumulator'ları
+   * mutate eder). Öncelik: ürün-seviyesi raporlar (product_ad_spend_daily) + manuel
+   * eşleştirme (product_ad_links → ad_spend entity harcaması, weight ile bölünür);
+   * günün artakalan harcaması eşlemesiz ürünlere ciro-payı ile dağıtılır. Hiçbiri
+   * yoksa davranış eski blended ciro-payına indirgenir (geri uyumlu).
+   */
+  private async attributeProductAdSpend(
+    storeId: string,
+    range: DateRange | undefined,
+    products: Map<string, ProductAccumulator>,
+    daily: Map<string, DailyMetricsAccumulator>,
+  ): Promise<void> {
+    // 1) Açık ürün-seviyesi harcama (auto raporlar + sentetik): date|pid → spend
+    const espConds = [eq(productAdSpendDaily.storeId, storeId)];
+    if (range) {
+      espConds.push(between(productAdSpendDaily.date, range.from, range.to));
+    }
+    const espRows = await this.db
+      .select({
+        date: productAdSpendDaily.date,
+        pid: productAdSpendDaily.productExternalId,
+        spend: sql<string>`sum(${productAdSpendDaily.spend})`,
+      })
+      .from(productAdSpendDaily)
+      .where(and(...espConds))
+      .groupBy(
+        productAdSpendDaily.date,
+        productAdSpendDaily.productExternalId,
+      );
+    const explicit = new Map<string, number>();
+    for (const r of espRows) explicit.set(`${r.date}|${r.pid}`, num(r.spend));
+
+    // 2) Manuel eşleştirme allokasyonu: links → entity günlük spend → ürün(ler)e weight
+    const links = await this.db
+      .select({
+        productExternalId: productAdLinks.productExternalId,
+        provider: productAdLinks.provider,
+        level: productAdLinks.level,
+        entityExternalId: productAdLinks.adEntityExternalId,
+        weight: productAdLinks.weight,
+      })
+      .from(productAdLinks)
+      .where(eq(productAdLinks.storeId, storeId));
+
+    const manual = new Map<string, number>(); // date|pid → spend
+    if (links.length > 0) {
+      const entityIds = [...new Set(links.map((l) => l.entityExternalId))];
+      const adConds = [
+        eq(adSpend.storeId, storeId),
+        inArray(adSpend.entityExternalId, entityIds),
+      ];
+      if (range) adConds.push(between(adSpend.date, range.from, range.to));
+      const adRows = await this.db
+        .select({
+          date: adSpend.date,
+          provider: adSpend.provider,
+          level: adSpend.level,
+          entityExternalId: adSpend.entityExternalId,
+          spend: sql<string>`sum(${adSpend.spend})`,
+        })
+        .from(adSpend)
+        .where(and(...adConds))
+        .groupBy(
+          adSpend.date,
+          adSpend.provider,
+          adSpend.level,
+          adSpend.entityExternalId,
+        );
+      const entitySpend = new Map<string, number>(); // provider|level|entity|date
+      for (const r of adRows) {
+        entitySpend.set(
+          `${r.provider}|${r.level}|${r.entityExternalId}|${r.date}`,
+          num(r.spend),
+        );
+      }
+      const groupTotal = new Map<string, number>(); // provider|level|entity → Σweight
+      for (const l of links) {
+        const k = `${l.provider}|${l.level}|${l.entityExternalId}`;
+        groupTotal.set(k, (groupTotal.get(k) ?? 0) + num(l.weight));
+      }
+      for (const l of links) {
+        const gk = `${l.provider}|${l.level}|${l.entityExternalId}`;
+        const total = groupTotal.get(gk) ?? 0;
+        if (total <= 0) continue;
+        const share = num(l.weight) / total;
+        for (const date of daily.keys()) {
+          const sp = entitySpend.get(`${gk}|${date}`);
+          if (!sp) continue;
+          const key = `${date}|${l.productExternalId}`;
+          manual.set(key, (manual.get(key) ?? 0) + sp * share);
+        }
+      }
+    }
+
+    // 3) Ürün başına açık+manuel atfı; gün başına toplam + eşlemesiz ciro topla
+    const dayAttributed = new Map<string, number>();
+    const dayUnattrRevenue = new Map<string, number>();
+    for (const p of products.values()) {
+      const key = `${p.date}|${p.productExternalId}`;
+      const direct = (explicit.get(key) ?? 0) + (manual.get(key) ?? 0);
+      p.attributedAdSpend = direct;
+      if (direct > 0) {
+        dayAttributed.set(p.date, (dayAttributed.get(p.date) ?? 0) + direct);
+      } else {
+        dayUnattrRevenue.set(
+          p.date,
+          (dayUnattrRevenue.get(p.date) ?? 0) + p.revenue,
+        );
+      }
+    }
+
+    // 4) Artakalan günlük harcamayı eşlemesiz ürünlere ciro-payı ile dağıt;
+    //    son olarak atfı ürün net kârından düş.
+    for (const p of products.values()) {
+      if (p.attributedAdSpend <= 0) {
+        const day = daily.get(p.date);
+        const unattrRev = dayUnattrRevenue.get(p.date) ?? 0;
+        if (day && day.adSpend > 0 && unattrRev > 0) {
+          const remaining = Math.max(
+            0,
+            day.adSpend - (dayAttributed.get(p.date) ?? 0),
+          );
+          p.attributedAdSpend = remaining * (p.revenue / unattrRev);
+        }
+      }
+      p.net -= p.attributedAdSpend;
+    }
   }
 
   /** Tüm aktif mağazaları tam yeniden hesaplar (gece scheduler). */

@@ -8,6 +8,8 @@ const CHANNEL_LABEL: Record<AdProvider, string> = {
   meta_ads: "Meta",
   google_ads: "Google",
   tiktok_ads: "TikTok",
+  amazon_ads: "Amazon Ads",
+  ebay_ads: "eBay Marketing",
 };
 
 export function ChannelWidget({ filter }: { filter: AnalyticsFilterParams }) {

@@ -12,6 +12,7 @@ export * from "./costs.js";
 export * from "./metrics.js";
 export * from "./ads.js";
 export * from "./analytics.js";
+export * from "./product-analytics.js";
 export * from "./dashboards.js";
 export * from "./mcp.js";
 export * from "./billing.js";

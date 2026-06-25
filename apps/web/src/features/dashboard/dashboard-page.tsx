@@ -71,7 +71,6 @@ export function DashboardPage() {
   const [range, setRange] = useState<DateRangeValue>({
     from: daysAgoIso(29),
     to: new Date().toISOString().slice(0, 10),
-    compare: false,
   });
   const [storeIds, setStoreIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -80,7 +79,7 @@ export function DashboardPage() {
   const [configId, setConfigId] = useState<string | null>(null);
 
   const globalFilter: DashFilter = useMemo(
-    () => ({ from: range.from, to: range.to, storeIds, compare: range.compare }),
+    () => ({ from: range.from, to: range.to, storeIds, compare: true }),
     [range, storeIds],
   );
 

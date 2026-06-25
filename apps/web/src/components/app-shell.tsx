@@ -4,6 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DashboardSquare01Icon,
   ShoppingBag01Icon,
+  PackageSearchIcon,
   Coins01Icon,
   Megaphone01Icon,
   PlugSocketIcon,
@@ -51,6 +52,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/", label: "Genel Bakış", icon: DashboardSquare01Icon, exact: true },
       { to: "/orders", label: "Siparişler", icon: ShoppingBag01Icon },
+      { to: "/products", label: "Ürün Analizi", icon: PackageSearchIcon },
       { to: "/costs", label: "Maliyetler", icon: Coins01Icon },
       { to: "/ads", label: "Reklamlar", icon: Megaphone01Icon },
     ],

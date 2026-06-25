@@ -23,6 +23,7 @@ import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { ApiKeysModule } from "./modules/api-keys/api-keys.module";
 import { McpModule } from "./modules/mcp/mcp.module";
 import { BillingModule } from "./modules/billing/billing.module";
+import { TrackingModule } from "./modules/tracking/tracking.module";
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { BillingModule } from "./modules/billing/billing.module";
     ApiKeysModule,
     McpModule,
     BillingModule,
+    TrackingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

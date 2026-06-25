@@ -8,6 +8,8 @@ export const INTEGRATION_PROVIDERS = [
   "meta_ads",
   "google_ads",
   "tiktok_ads",
+  "amazon_ads",
+  "ebay_ads",
 ] as const;
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
 

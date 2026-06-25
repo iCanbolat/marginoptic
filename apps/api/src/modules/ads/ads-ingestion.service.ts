@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { AdProvider } from "@churnify/shared";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
 import { adEntities, adSpend } from "../../database/schema/ads";
+import { productAdSpendDaily } from "../../database/schema/product-analytics";
 import type { AdInsightsResult } from "../integrations/ads/ad-connector.types";
 
 /**
@@ -18,7 +19,7 @@ export class AdsIngestionService {
     connectionId: string,
     provider: AdProvider,
     result: AdInsightsResult,
-  ): Promise<{ entities: number; spend: number }> {
+  ): Promise<{ entities: number; spend: number; productSpend: number }> {
     const now = new Date();
 
     for (const e of result.entities) {
@@ -93,6 +94,42 @@ export class AdsIngestionService {
         });
     }
 
-    return { entities: result.entities.length, spend: result.spend.length };
+    // Ürün-seviyesi harcama (yalnız ürün-raporlu sağlayıcılar / manuel allokasyon
+    // sonrası). product_profit_daily ile (storeId, productExternalId, date) join olur.
+    const productSpend = result.productSpend ?? [];
+    for (const p of productSpend) {
+      await this.db
+        .insert(productAdSpendDaily)
+        .values({
+          storeId,
+          date: p.date,
+          productExternalId: p.productExternalId,
+          provider,
+          spend: p.spend,
+          clicks: p.clicks,
+          conversions: p.conversions,
+          conversionValue: p.conversionValue,
+        })
+        .onConflictDoUpdate({
+          target: [
+            productAdSpendDaily.storeId,
+            productAdSpendDaily.provider,
+            productAdSpendDaily.productExternalId,
+            productAdSpendDaily.date,
+          ],
+          set: {
+            spend: p.spend,
+            clicks: p.clicks,
+            conversions: p.conversions,
+            conversionValue: p.conversionValue,
+          },
+        });
+    }
+
+    return {
+      entities: result.entities.length,
+      spend: result.spend.length,
+      productSpend: productSpend.length,
+    };
   }
 }

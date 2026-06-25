@@ -32,6 +32,8 @@ import {
   type IntegrationsOverview,
   type ShopifyInstallInput,
   type ShopifyInstallResponse,
+  type SyncAllResult,
+  type SyncAllStatus,
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import {
@@ -51,6 +53,21 @@ export class IntegrationsController {
   @Get()
   overview(@CurrentOrg() org: ActiveOrg): Promise<IntegrationsOverview> {
     return this.integrations.overview(org.id);
+  }
+
+  /** Tüm sağlayıcılardan senkron cooldown durumu (tek-buton UI'ı için). */
+  @ApiBearerAuth()
+  @Get("sync-all")
+  syncAllStatus(@CurrentOrg() org: ActiveOrg): Promise<SyncAllStatus> {
+    return this.integrations.syncAllStatus(org.id);
+  }
+
+  /** Tüm sağlayıcılardan senkronu tetikler (15 dk cooldown). */
+  @ApiBearerAuth()
+  @HttpCode(200)
+  @Post("sync-all")
+  syncAll(@CurrentOrg() org: ActiveOrg): Promise<SyncAllResult> {
+    return this.integrations.syncAllForOrg(org.id);
   }
 
   @ApiBearerAuth()

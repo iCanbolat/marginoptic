@@ -17,6 +17,7 @@ import { IntegrationsPage } from "@/features/integrations/integrations-page";
 import { OrdersPage } from "@/features/orders/orders-page";
 import { CostsPage } from "@/features/costs/costs-page";
 import { AdsPage } from "@/features/ads/ads-page";
+import { ProductsPage } from "@/features/products/products-page";
 import { ChartsPreviewPage } from "@/features/preview/charts-preview";
 
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
@@ -49,6 +50,12 @@ const ordersRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/orders",
   component: OrdersPage,
+});
+
+const productsRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/products",
+  component: ProductsPage,
 });
 
 const costsRoute = createRoute({
@@ -113,6 +120,7 @@ const routeTree = rootRoute.addChildren([
     dashboardRoute,
     integrationsRoute,
     ordersRoute,
+    productsRoute,
     costsRoute,
     adsRoute,
     membersRoute,
