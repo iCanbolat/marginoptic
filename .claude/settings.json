@@ -208,7 +208,12 @@
       "Bash(ls node_modules/.bin/eslint)",
       "Bash(find apps/web apps/api -maxdepth 1 -name \".eslintrc*\" -o -maxdepth 1 -name \"eslint.config*\")",
       "Bash(ls apps/web/node_modules/.bin/eslint)",
-      "Bash(ls apps/api/node_modules/.bin/eslint)"
+      "Bash(ls apps/api/node_modules/.bin/eslint)",
+      "Bash(echo \"dev started pid $!\")",
+      "Bash(curl -s http://localhost:3001)",
+      "Bash(curl -s -o /dev/null -w \"homepage HTTP %{http_code}\\\\n\" http://localhost:3001)",
+      "Bash(pkill -f \"next dev -p 3001\")",
+      "Bash(curl -s -o /dev/null http://localhost:3001)"
     ],
     "additionalDirectories": [
       "/tmp",

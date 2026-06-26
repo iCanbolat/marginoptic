@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none" role="img" aria-label="MarginOptic app icon">
+  <defs>
+    <marker id="mo-arrow-ico" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="26" refX="20" refY="13" orient="auto">
+      <path d="M2 1 L24 13 L2 25 L9 13 Z" fill="#FCFBF8"></path>
+    </marker>
+    <mask id="mo-cut-ico" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="#fff"></rect>
+      <path d="M15 106 Q57 92 111 31" stroke="#000" stroke-width="18" fill="none" stroke-linecap="round"></path>
+    </mask>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="#A50436"></rect>
+  <g transform="translate(87,96) scale(2.6)">
+    <path d="M26 103 L26 29 L64 75 L102 29 L102 103" stroke="#FCFBF8" stroke-width="17" stroke-linejoin="miter" mask="url(#mo-cut-ico)"></path>
+    <path d="M15 106 Q57 92 105 36" stroke="#FCFBF8" stroke-width="8.5" fill="none" stroke-linecap="round" marker-end="url(#mo-arrow-ico)"></path>
+  </g>
+</svg>
