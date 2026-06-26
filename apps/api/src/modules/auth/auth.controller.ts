@@ -3,7 +3,9 @@ import {
   Controller,
   Get,
   HttpCode,
+  Logger,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -24,6 +26,7 @@ import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { AuthService } from "./auth.service";
 import type { AuthContext } from "./auth.types";
 import { CurrentUser } from "./decorators/current-user.decorator";
+import { GoogleAuthService } from "./google-auth.service";
 import { Public } from "./decorators/public.decorator";
 
 const REFRESH_COOKIE = "churnify_rt";
@@ -32,8 +35,11 @@ const REFRESH_PATH = "/api/auth";
 @ApiTags("auth")
 @Controller("auth")
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly auth: AuthService,
+    private readonly google: GoogleAuthService,
     private readonly config: ConfigService,
   ) {}
 
@@ -84,6 +90,35 @@ export class AuthController {
     const token = req.cookies?.[REFRESH_COOKIE] as string | undefined;
     if (token) await this.auth.logout(token);
     res.clearCookie(REFRESH_COOKIE, { path: REFRESH_PATH });
+  }
+
+  /** Google sosyal-login başlat: state üret, Google onay ekranına yönlendir. */
+  @Public()
+  @Get("google/start")
+  async googleStart(@Res() res: Response): Promise<void> {
+    const url = await this.google.createAuthUrl();
+    res.redirect(url);
+  }
+
+  /**
+   * Google callback: state doğrula + oturum kur, refresh cookie set et,
+   * web'in /auth/callback rotasına yönlendir (orada refresh ile oturum alınır).
+   */
+  @Public()
+  @Get("google/callback")
+  async googleCallback(
+    @Query() query: Record<string, string>,
+    @Res() res: Response,
+  ): Promise<void> {
+    const webOrigin = this.config.getOrThrow<string>("WEB_ORIGIN");
+    try {
+      const { refreshToken } = await this.google.handleCallback(query);
+      this.setRefreshCookie(res, refreshToken);
+      res.redirect(`${webOrigin}/auth/callback`);
+    } catch (err) {
+      this.logger.warn(`Google callback başarısız: ${String(err)}`);
+      res.redirect(`${webOrigin}/login?error=google`);
+    }
   }
 
   @ApiBearerAuth()

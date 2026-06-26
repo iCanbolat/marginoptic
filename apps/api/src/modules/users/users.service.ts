@@ -26,4 +26,13 @@ export class UsersService {
       .limit(1);
     return row;
   }
+
+  async findByGoogleId(googleId: string): Promise<UserRow | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.googleId, googleId))
+      .limit(1);
+    return row;
+  }
 }

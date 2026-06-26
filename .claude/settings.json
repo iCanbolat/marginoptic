@@ -203,7 +203,12 @@
       "Bash(perl -0pi -e 's/usage: \\\\{ channels: storesCount/usage: { stores: storesCount/' modules/billing/billing.service.ts)",
       "Bash(perl -0pi -e 's{fooAmazon\\\\.storeId}{fooAmazon.channelId}g; s{abcShopify\\\\.storeId}{abcShopify.channelId}g;' scripts/seed-dev.mjs)",
       "Bash(perl -0pi -e 's{// \\\\{ storeId \\\\\\(per-channel\\\\\\), connectionId \\\\}}{// { channelId \\(per-channel\\), connectionId }}' scripts/seed-dev.mjs)",
-      "Bash(grep -rnE '\"/stores|`/stores|/stores/\\\\$|/stores\\\\?' src)"
+      "Bash(grep -rnE '\"/stores|`/stores|/stores/\\\\$|/stores\\\\?' src)",
+      "Bash(ls eslint.config.* apps/web/eslint.config.* apps/api/eslint.config.*)",
+      "Bash(ls node_modules/.bin/eslint)",
+      "Bash(find apps/web apps/api -maxdepth 1 -name \".eslintrc*\" -o -maxdepth 1 -name \"eslint.config*\")",
+      "Bash(ls apps/web/node_modules/.bin/eslint)",
+      "Bash(ls apps/api/node_modules/.bin/eslint)"
     ],
     "additionalDirectories": [
       "/tmp",

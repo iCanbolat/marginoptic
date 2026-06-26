@@ -6,6 +6,7 @@ import { registerSchema, type RegisterInput } from "@churnify/shared";
 import { ApiError, authApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/store";
 import { AuthLayout } from "./auth-layout";
+import { GoogleButton } from "./google-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,12 @@ export function RegisterPage() {
 
   return (
     <AuthLayout title="Kayıt ol" subtitle="Yeni bir hesap oluştur">
+      <GoogleButton label="Google ile devam et" />
+      <div className="my-4 flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-xs text-muted-foreground">veya</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="name">Ad Soyad</Label>

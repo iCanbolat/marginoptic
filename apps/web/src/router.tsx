@@ -6,10 +6,12 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { useAuthStore } from "@/lib/auth/store";
+import { authApi } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { LoginPage } from "@/features/auth/login-page";
 import { RegisterPage } from "@/features/auth/register-page";
+import { AuthCallbackPage } from "@/features/auth/auth-callback-page";
 import { StoresPage } from "@/features/settings/stores-page";
 import { ApiKeysPage } from "@/features/settings/api-keys-page";
 import { BillingPage } from "@/features/billing/billing-page";
@@ -115,6 +117,20 @@ const registerRoute = createRoute({
   beforeLoad: redirectIfAuthed,
 });
 
+/**
+ * Google OAuth dönüşü: backend `churnify_rt` cookie'sini set etmiş olur.
+ * Burada refresh ile access token + oturum alınır, sonra panoya yönlendirilir.
+ */
+const authCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/callback",
+  component: AuthCallbackPage,
+  beforeLoad: async () => {
+    const token = await authApi.refresh();
+    throw redirect({ to: token ? "/" : "/login" });
+  },
+});
+
 const routeTree = rootRoute.addChildren([
   appLayoutRoute.addChildren([
     dashboardRoute,
@@ -130,6 +146,7 @@ const routeTree = rootRoute.addChildren([
   ]),
   loginRoute,
   registerRoute,
+  authCallbackRoute,
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: "intent" });

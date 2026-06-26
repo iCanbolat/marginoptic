@@ -54,7 +54,7 @@ import { useAuthStore } from "./auth/store";
 import { refreshSession } from "./auth/refresh";
 import { ApiError, toApiError } from "./errors";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 /** MCP Streamable HTTP ucu — per-org API key ile erişilir (Faz 8). */
 export const MCP_ENDPOINT = `${API_URL}/api/mcp`;

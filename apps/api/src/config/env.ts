@@ -16,6 +16,11 @@ export const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(8).default("dev-access-secret-change-me"),
   JWT_REFRESH_SECRET: z.string().min(8).default("dev-refresh-secret-change-me"),
 
+  // Google sosyal-login (kullanıcı girişi) — Ads OAuth'tan (GOOGLE_ADS_*) ayrıdır.
+  // Anahtarlar boşsa /auth/google/start 400 döner (sosyal-login kapalı).
+  GOOGLE_OAUTH_CLIENT_ID: z.string().default(""),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().default(""),
+
   // AES-256-GCM için 32 byte (64 hex) anahtar (Faz 2)
   TOKEN_ENCRYPTION_KEY: z.string().length(64).default("0".repeat(64)),
 

@@ -10,8 +10,11 @@ import {
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 320 }).notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  // Sosyal-login (Google) ile oluşan hesaplarda parola yoktur — bu yüzden nullable.
+  passwordHash: text("password_hash"),
   name: varchar("name", { length: 200 }).notNull(),
+  // Google "sub" (kalıcı kullanıcı kimliği). Parola hesabıyla aynı e-postada eşlenir.
+  googleId: varchar("google_id", { length: 255 }).unique(),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

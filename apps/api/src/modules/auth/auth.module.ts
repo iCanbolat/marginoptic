@@ -6,6 +6,8 @@ import { StoresModule } from "../stores/stores.module";
 import { UsersModule } from "../users/users.module";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
+import { GoogleAuthService } from "./google-auth.service";
+import { GoogleConnector } from "./google.connector";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { TokenService } from "./token.service";
 
@@ -22,7 +24,13 @@ import { TokenService } from "./token.service";
     StoresModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, TokenService, JwtStrategy],
+  providers: [
+    AuthService,
+    GoogleAuthService,
+    GoogleConnector,
+    TokenService,
+    JwtStrategy,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

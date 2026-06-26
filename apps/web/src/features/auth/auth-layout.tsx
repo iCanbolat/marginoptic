@@ -18,9 +18,6 @@ export function AuthLayout({
 }) {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
-      {/* Animasyonlu bulanık blob arkaplan — dekoratif, içerik akışının dışında.
-          Negatif z-index kullanmıyoruz: aksi halde parent'ın opak arkaplanının
-          ALTINDA kalıp görünmez olur. */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="animate-blob absolute -left-24 -top-24 size-112 rounded-full bg-primary/30 blur-3xl"
@@ -41,7 +38,7 @@ export function AuthLayout({
           <img
             src="/horizontal-lockup-light.svg"
             alt="MarginOptic"
-            className="mx-auto mb-3 h-12 w-auto"
+            className="mx-auto h-20 w-auto"
           />
           <CardTitle>{title}</CardTitle>
           <CardDescription>{subtitle}</CardDescription>
