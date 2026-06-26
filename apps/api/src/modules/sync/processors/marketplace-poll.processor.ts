@@ -6,7 +6,7 @@ import { DRIZZLE, type DrizzleDB } from "../../../database/database.module";
 import {
   integrationConnections,
   syncState,
-} from "../../../database/schema/stores";
+} from "../../../database/schema/channels";
 import {
   MARKETPLACE_POLL_SCHEDULER,
   QUEUE_MARKETPLACE_POLL,
@@ -55,26 +55,26 @@ export class MarketplacePollProcessor
       .select({
         id: integrationConnections.id,
         provider: integrationConnections.provider,
-        storeId: integrationConnections.storeId,
+        channelId: integrationConnections.channelId,
         externalAccountId: integrationConnections.externalAccountId,
       })
       .from(integrationConnections)
       .where(
         and(
           eq(integrationConnections.status, "active"),
-          isNotNull(integrationConnections.storeId),
+          isNotNull(integrationConnections.channelId),
           inArray(integrationConnections.provider, [...POLL_PROVIDERS]),
         ),
       );
 
     let enqueued = 0;
     for (const conn of conns) {
-      if (!conn.storeId) continue;
+      if (!conn.channelId) continue;
       const since = await this.watermark(conn.id);
-      const shopId = conn.externalAccountId ?? conn.storeId;
+      const shopId = conn.externalAccountId ?? conn.channelId;
       await this.dispatch(conn.provider as PollProvider, {
         connectionId: conn.id,
-        storeId: conn.storeId,
+        channelId: conn.channelId,
         shopId,
         since,
       });
@@ -104,7 +104,7 @@ export class MarketplacePollProcessor
 
   private async dispatch(
     provider: PollProvider,
-    args: { connectionId: string; storeId: string; shopId: string; since?: string },
+    args: { connectionId: string; channelId: string; shopId: string; since?: string },
   ): Promise<void> {
     switch (provider) {
       case "ebay":

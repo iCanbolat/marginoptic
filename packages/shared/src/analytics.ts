@@ -108,7 +108,7 @@ export interface TimeseriesResponse {
 
 /** Ürün kârlılık satırı (mağaza bilgisiyle, org genelinde sıralama için). */
 export interface ProductRankingRow extends ProductProfitRow {
-  storeId: string;
+  channelId: string;
   storeName: string;
   /** Önceki dönem net kârı (yalnızca compare açıkken; aksi halde null). */
   previousNetProfit: string | null;
@@ -125,7 +125,7 @@ export interface ProductRankingResponse {
 
 /** Çok-mağaza karşılaştırma satırı. */
 export interface StoreComparisonRow {
-  storeId: string;
+  channelId: string;
   storeName: string;
   currency: string;
   totals: MetricsTotals;
@@ -140,7 +140,7 @@ export interface StoreComparisonResponse {
 // ---- Müşteri analitiği (LTV / CAC / kohort) ----
 
 export interface TopCustomer {
-  storeId: string;
+  channelId: string;
   customerExternalId: string;
   email: string | null;
   orders: number;

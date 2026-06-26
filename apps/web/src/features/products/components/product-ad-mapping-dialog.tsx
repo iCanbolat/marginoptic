@@ -41,7 +41,7 @@ interface Props {
 }
 
 export function ProductAdMappingDialog({ row, onOpenChange }: Props) {
-  const storeId = row?.storeId ?? null;
+  const channelId = row?.channelId ?? null;
   const productId = row?.productExternalId ?? null;
 
   const [provider, setProvider] = useState<AdProvider>("meta_ads");
@@ -52,9 +52,9 @@ export function ProductAdMappingDialog({ row, onOpenChange }: Props) {
     setEntityId("");
   }, [row]);
 
-  const linksQ = useProductLinks(storeId, productId);
-  const entitiesQ = useAdEntities(storeId, provider);
-  const { create, remove } = useProductLinkMutations(storeId);
+  const linksQ = useProductLinks(channelId, productId);
+  const entitiesQ = useAdEntities(channelId, provider);
+  const { create, remove } = useProductLinkMutations(channelId);
 
   // Eşleştirme için kampanyaları tercih et (yoksa tüm varlıklar).
   const entityOptions = useMemo(() => {

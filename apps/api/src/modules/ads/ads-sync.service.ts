@@ -4,7 +4,7 @@ import { Queue } from "bullmq";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { AD_PROVIDERS, type AdProvider } from "@churnify/shared";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
-import { integrationConnections } from "../../database/schema/stores";
+import { integrationConnections } from "../../database/schema/channels";
 import { SyncService } from "../sync/sync.service";
 import {
   ADS_BACKFILL_DAYS,
@@ -30,7 +30,7 @@ export class AdsSyncService {
   /** Bağlanma sonrası ilk backfill (geçmiş `ADS_BACKFILL_DAYS` gün). */
   async enqueueBackfill(args: {
     connectionId: string;
-    storeId: string;
+    channelId: string;
     provider: AdProvider;
     externalAccountId: string;
   }): Promise<void> {
@@ -45,7 +45,7 @@ export class AdsSyncService {
     const rows = await this.db
       .select({
         id: integrationConnections.id,
-        storeId: integrationConnections.storeId,
+        channelId: integrationConnections.channelId,
         provider: integrationConnections.provider,
         externalAccountId: integrationConnections.externalAccountId,
       })
@@ -54,7 +54,7 @@ export class AdsSyncService {
         and(
           inArray(integrationConnections.provider, [...AD_PROVIDERS]),
           eq(integrationConnections.status, "active"),
-          isNotNull(integrationConnections.storeId),
+          isNotNull(integrationConnections.channelId),
         ),
       );
 
@@ -64,7 +64,7 @@ export class AdsSyncService {
       await this.sync.setSyncState(r.id, ADS_RESOURCE, "queued");
       await this.queue.add("ads-incremental", {
         connectionId: r.id,
-        storeId: r.storeId!,
+        channelId: r.channelId!,
         provider: r.provider as AdProvider,
         externalAccountId: r.externalAccountId ?? "",
         since,

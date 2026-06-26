@@ -32,12 +32,12 @@ import {
   previousRange,
   type RawMetricRow,
 } from "./analytics-math";
-import { resolveOrgStores } from "./org-stores";
+import { resolveStoreChannels } from "./store-channels";
 
 const CACHE_TTL = 300;
 
-/** Bir gün/mağaza satırı (storeId + date + ham metrikler). */
-type Row = RawMetricRow & { storeId: string; date: string };
+/** Bir gün/mağaza satırı (channelId + date + ham metrikler). */
+type Row = RawMetricRow & { channelId: string; date: string };
 
 /** Org-kapsamlı, çok-mağaza analitik okumaları (Redis cache'li). */
 @Injectable()
@@ -51,13 +51,13 @@ export class AnalyticsService {
   // ---- Kâr özeti (+ opsiyonel önceki dönem karşılaştırması) ----
 
   async profitSummary(
-    orgId: string,
+    storeId: string,
     filter: AnalyticsFilter,
   ): Promise<ProfitSummaryResponse> {
-    return this.cached(orgId, "profit-summary", filter, async () => {
-      const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-      const ids = stores.map((s) => s.id);
-      const currency = stores[0]?.currency ?? "USD";
+    return this.cached(storeId, "profit-summary", filter, async () => {
+      const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+      const ids = channels.map((s) => s.id);
+      const currency = channels[0]?.currency ?? "USD";
       const totals = buildTotals(await this.loadTotals(ids, filter.from, filter.to));
 
       let comparison: ProfitSummaryResponse["comparison"] = null;
@@ -95,11 +95,11 @@ export class AnalyticsService {
 
   // ---- P&L (gelir tablosu satırları) ----
 
-  async pnl(orgId: string, filter: AnalyticsFilter): Promise<PnlResponse> {
-    return this.cached(orgId, "pnl", filter, async () => {
-      const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-      const ids = stores.map((s) => s.id);
-      const currency = stores[0]?.currency ?? "USD";
+  async pnl(storeId: string, filter: AnalyticsFilter): Promise<PnlResponse> {
+    return this.cached(storeId, "pnl", filter, async () => {
+      const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+      const ids = channels.map((s) => s.id);
+      const currency = channels[0]?.currency ?? "USD";
       const acc = await this.loadTotals(ids, filter.from, filter.to);
       const netProfit = dailyNetProfit(acc);
       const revenue = acc.revenue;
@@ -142,13 +142,13 @@ export class AnalyticsService {
   // ---- Zaman serisi (gün başına, mağazalar toplanmış) ----
 
   async timeseries(
-    orgId: string,
+    storeId: string,
     filter: AnalyticsFilter,
   ): Promise<TimeseriesResponse> {
-    return this.cached(orgId, "timeseries", filter, async () => {
-      const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-      const ids = stores.map((s) => s.id);
-      const currency = stores[0]?.currency ?? "USD";
+    return this.cached(storeId, "timeseries", filter, async () => {
+      const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+      const ids = channels.map((s) => s.id);
+      const currency = channels[0]?.currency ?? "USD";
       const rows = await this.fetchRows(ids, filter.from, filter.to);
 
       const byDay = new Map<string, ReturnType<typeof emptyDaily>>();
@@ -187,20 +187,20 @@ export class AnalyticsService {
   // ---- Çok-mağaza karşılaştırma ----
 
   async storeComparison(
-    orgId: string,
+    storeId: string,
     filter: AnalyticsFilter,
   ): Promise<StoreComparisonResponse> {
-    return this.cached(orgId, "store-comparison", filter, async () => {
-      const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-      const ids = stores.map((s) => s.id);
+    return this.cached(storeId, "store-comparison", filter, async () => {
+      const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+      const ids = channels.map((s) => s.id);
       const rows = await this.fetchRows(ids, filter.from, filter.to);
 
       const byStore = new Map<string, ReturnType<typeof emptyDaily>>();
       for (const r of rows) {
-        let acc = byStore.get(r.storeId);
+        let acc = byStore.get(r.channelId);
         if (!acc) {
           acc = emptyDaily();
-          byStore.set(r.storeId, acc);
+          byStore.set(r.channelId, acc);
         }
         addRow(acc, r);
       }
@@ -208,8 +208,8 @@ export class AnalyticsService {
       return {
         from: filter.from,
         to: filter.to,
-        rows: stores.map((s) => ({
-          storeId: s.id,
+        rows: channels.map((s) => ({
+          channelId: s.id,
           storeName: s.name,
           currency: s.currency,
           totals: buildTotals(byStore.get(s.id) ?? emptyDaily()),
@@ -221,21 +221,21 @@ export class AnalyticsService {
   // ---- Ürün kârlılık sıralaması (org genelinde) ----
 
   async productRanking(
-    orgId: string,
+    storeId: string,
     filter: AnalyticsFilter,
     limit: number,
   ): Promise<ProductRankingResponse> {
-    return this.cached(orgId, `products:${limit}`, filter, async () => {
-      const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-      const ids = stores.map((s) => s.id);
-      const nameById = new Map(stores.map((s) => [s.id, s.name]));
+    return this.cached(storeId, `products:${limit}`, filter, async () => {
+      const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+      const ids = channels.map((s) => s.id);
+      const nameById = new Map(channels.map((s) => [s.id, s.name]));
       if (ids.length === 0) {
         return { from: filter.from, to: filter.to, storeIds: ids, rows: [] };
       }
 
       const rows = await this.db
         .select({
-          storeId: productProfitDaily.storeId,
+          channelId: productProfitDaily.channelId,
           productExternalId: productProfitDaily.productExternalId,
           title: sql<string | null>`max(${productProfitDaily.title})`,
           currency: sql<string>`max(${productProfitDaily.currency})`,
@@ -248,11 +248,11 @@ export class AnalyticsService {
         .from(productProfitDaily)
         .where(
           and(
-            inArray(productProfitDaily.storeId, ids),
+            inArray(productProfitDaily.channelId, ids),
             between(productProfitDaily.date, filter.from, filter.to),
           ),
         )
-        .groupBy(productProfitDaily.storeId, productProfitDaily.productExternalId)
+        .groupBy(productProfitDaily.channelId, productProfitDaily.productExternalId)
         .orderBy(desc(sql`sum(${productProfitDaily.netProfit})`))
         .limit(limit);
 
@@ -267,13 +267,13 @@ export class AnalyticsService {
         storeIds: ids,
         rows: rows.map((r) => {
           const prevNet = prevNetById?.get(
-            `${r.storeId}:${r.productExternalId}`,
+            `${r.channelId}:${r.productExternalId}`,
           );
           const netProfitDelta =
             prevNet != null ? pctChange(num(r.netProfit), prevNet) : null;
           return {
-            storeId: r.storeId,
-            storeName: nameById.get(r.storeId) ?? "—",
+            channelId: r.channelId,
+            storeName: nameById.get(r.channelId) ?? "—",
             productExternalId: r.productExternalId,
             title: r.title,
             currency: r.currency,
@@ -290,7 +290,7 @@ export class AnalyticsService {
     });
   }
 
-  /** Önceki dönem net kârı: `storeId:productExternalId` → toplam net kâr. */
+  /** Önceki dönem net kârı: `channelId:productExternalId` → toplam net kâr. */
   private async previousProductNet(
     storeIds: string[],
     from: string,
@@ -299,34 +299,34 @@ export class AnalyticsService {
     const prev = previousRange(from, to);
     const rows = await this.db
       .select({
-        storeId: productProfitDaily.storeId,
+        channelId: productProfitDaily.channelId,
         productExternalId: productProfitDaily.productExternalId,
         netProfit: sql<string>`sum(${productProfitDaily.netProfit})`,
       })
       .from(productProfitDaily)
       .where(
         and(
-          inArray(productProfitDaily.storeId, storeIds),
+          inArray(productProfitDaily.channelId, storeIds),
           between(productProfitDaily.date, prev.from, prev.to),
         ),
       )
-      .groupBy(productProfitDaily.storeId, productProfitDaily.productExternalId);
+      .groupBy(productProfitDaily.channelId, productProfitDaily.productExternalId);
     return new Map(
-      rows.map((r) => [`${r.storeId}:${r.productExternalId}`, num(r.netProfit)]),
+      rows.map((r) => [`${r.channelId}:${r.productExternalId}`, num(r.netProfit)]),
     );
   }
 
   // ---- Reklam performansı (org genelinde, çok-mağaza) ----
 
   async adsPerformance(
-    orgId: string,
+    storeId: string,
     filter: AnalyticsFilter,
     level: AdLevel,
   ): Promise<AdsPerformanceResponse> {
-    return this.cached(orgId, `ads:${level}`, filter, async () => {
-      const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-      const ids = stores.map((s) => s.id);
-      const currency = stores[0]?.currency ?? "USD";
+    return this.cached(storeId, `ads:${level}`, filter, async () => {
+      const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+      const ids = channels.map((s) => s.id);
+      const currency = channels[0]?.currency ?? "USD";
       return this.ads.getOrgPerformance(ids, currency, filter.from, filter.to, level);
     });
   }
@@ -342,7 +342,7 @@ export class AnalyticsService {
     if (storeIds.length === 0) return [];
     const rows = await this.db
       .select({
-        storeId: dailyStoreMetrics.storeId,
+        channelId: dailyStoreMetrics.channelId,
         date: dailyStoreMetrics.date,
         revenue: dailyStoreMetrics.revenue,
         discounts: dailyStoreMetrics.discounts,
@@ -359,7 +359,7 @@ export class AnalyticsService {
       .from(dailyStoreMetrics)
       .where(
         and(
-          inArray(dailyStoreMetrics.storeId, storeIds),
+          inArray(dailyStoreMetrics.channelId, storeIds),
           between(dailyStoreMetrics.date, from, to),
         ),
       )
@@ -376,14 +376,14 @@ export class AnalyticsService {
    * Anahtarlar `CUSTOM_METRIC_FIELDS` ile eşleşir (revenue..units + netProfit).
    */
   async fieldValues(
-    orgId: string,
+    storeId: string,
     filter: AnalyticsFilter,
   ): Promise<{ currency: string; storeIds: string[]; values: Record<string, number> }> {
-    const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-    const ids = stores.map((s) => s.id);
+    const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+    const ids = channels.map((s) => s.id);
     const acc = await this.loadTotals(ids, filter.from, filter.to);
     return {
-      currency: stores[0]?.currency ?? "USD",
+      currency: channels[0]?.currency ?? "USD",
       storeIds: ids,
       values: {
         revenue: acc.revenue,
@@ -404,13 +404,13 @@ export class AnalyticsService {
 
   /** Org + uç + filtre anahtarıyla TTL'li cache. */
   private async cached<T>(
-    orgId: string,
+    storeId: string,
     endpoint: string,
     filter: AnalyticsFilter,
     fn: () => Promise<T>,
   ): Promise<T> {
-    const stores = filter.storeIds.length ? [...filter.storeIds].sort().join(",") : "all";
-    const key = `analytics:${orgId}:${endpoint}:${filter.from}:${filter.to}:${stores}:${filter.compare ? 1 : 0}`;
+    const channels = filter.storeIds.length ? [...filter.storeIds].sort().join(",") : "all";
+    const key = `analytics:${storeId}:${endpoint}:${filter.from}:${filter.to}:${channels}:${filter.compare ? 1 : 0}`;
     const hit = await this.redis.get(key);
     if (hit) return JSON.parse(hit) as T;
     const val = await fn();

@@ -9,18 +9,16 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { organizations } from "./auth";
+import { stores } from "./auth";
 
 export const salesChannel = pgEnum("sales_channel", [
   "shopify",
-  "etsy",
   "ebay",
   "amazon",
 ]);
 
 export const integrationProvider = pgEnum("integration_provider", [
   "shopify",
-  "etsy",
   "ebay",
   "amazon",
   "meta_ads",
@@ -45,17 +43,17 @@ export const syncStatus = pgEnum("sync_status", [
   "error",
 ]);
 
-/** Satış kanalı mağazası (Shopify/Etsy). */
-export const stores = pgTable(
-  "stores",
+/** Satış kanalı mağazası (Shopify/Amazon/eBay). */
+export const channels = pgTable(
+  "channels",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
+    storeId: uuid("store_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => stores.id, { onDelete: "cascade" }),
     channel: salesChannel("channel").notNull(),
     name: varchar("name", { length: 200 }).notNull(),
-    // Shopify için "x.myshopify.com", Etsy için shop_id
+    // Shopify için "x.myshopify.com", marketplace için satıcı/shop id
     externalShopId: varchar("external_shop_id", { length: 255 }).notNull(),
     domain: varchar("domain", { length: 255 }),
     currency: varchar("currency", { length: 3 }).notNull().default("USD"),
@@ -72,12 +70,9 @@ export const stores = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_store_org_channel_external").on(
-      t.organizationId,
-      t.channel,
-      t.externalShopId,
-    ),
-    index("idx_store_org").on(t.organizationId),
+    // Store başına kanal-tekilliği: bir mağazada her kanaldan en fazla 1 bağlantı.
+    uniqueIndex("uq_store_org_channel").on(t.storeId, t.channel),
+    index("idx_store_org").on(t.storeId),
   ],
 );
 
@@ -86,10 +81,10 @@ export const integrationConnections = pgTable(
   "integration_connections",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
+    storeId: uuid("store_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    storeId: uuid("store_id").references(() => stores.id, {
+      .references(() => stores.id, { onDelete: "cascade" }),
+    channelId: uuid("channel_id").references(() => channels.id, {
       onDelete: "set null",
     }),
     provider: integrationProvider("provider").notNull(),
@@ -108,9 +103,9 @@ export const integrationConnections = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("idx_conn_org").on(t.organizationId),
+    index("idx_conn_org").on(t.storeId),
     uniqueIndex("uq_conn_org_provider_account").on(
-      t.organizationId,
+      t.storeId,
       t.provider,
       t.externalAccountId,
     ),

@@ -8,7 +8,7 @@ import { TrafficSyncProcessor } from "./processors/traffic-sync.processor";
 /**
  * Dönüşüm izleme. Shopify Web Pixel olay alıcısı (public `/track/pixel`) + Amazon/eBay
  * ürün-traffic senkronu → `product_traffic_daily`. Conversion rate ürün analizi
- * okuma katmanında purchases/sessions olarak türetilir. Etsy izlenmez.
+ * okuma katmanında purchases/sessions olarak türetilir
  */
 @Module({
   imports: [BullModule.registerQueue({ name: QUEUE_TRAFFIC_SYNC })],

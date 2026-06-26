@@ -63,7 +63,7 @@ export interface MetricsTotals {
 
 /** Mağaza metrik özeti: günlük seri + aralık toplamları. */
 export interface StoreMetricsSummary {
-  storeId: string;
+  channelId: string;
   currency: string;
   from: string;
   to: string;
@@ -85,6 +85,6 @@ export interface ProductProfitRow {
 
 /** Mağaza metriklerini yeniden hesaplama (manuel tetikleme) yanıtı. */
 export interface RecomputeResult {
-  storeId: string;
+  channelId: string;
   enqueued: true;
 }

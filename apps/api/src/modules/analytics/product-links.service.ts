@@ -26,12 +26,12 @@ export class ProductLinksService {
   ) {}
 
   async list(
-    orgId: string,
     storeId: string,
+    channelId: string,
     productExternalId?: string,
   ): Promise<ProductAdLink[]> {
-    await assertStoreInOrg(this.db, orgId, storeId);
-    const conds = [eq(productAdLinks.storeId, storeId)];
+    await assertStoreInOrg(this.db, storeId, channelId);
+    const conds = [eq(productAdLinks.channelId, channelId)];
     if (productExternalId) {
       conds.push(eq(productAdLinks.productExternalId, productExternalId));
     }
@@ -44,15 +44,15 @@ export class ProductLinksService {
   }
 
   async create(
-    orgId: string,
     storeId: string,
+    channelId: string,
     input: ProductAdLinkCreateInput,
   ): Promise<ProductAdLink> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const [row] = await this.db
       .insert(productAdLinks)
       .values({
-        storeId,
+        channelId,
         productExternalId: input.productExternalId,
         provider: input.provider,
         adEntityExternalId: input.adEntityExternalId,
@@ -62,7 +62,7 @@ export class ProductLinksService {
       })
       .onConflictDoUpdate({
         target: [
-          productAdLinks.storeId,
+          productAdLinks.channelId,
           productAdLinks.productExternalId,
           productAdLinks.provider,
           productAdLinks.adEntityExternalId,
@@ -75,26 +75,26 @@ export class ProductLinksService {
       })
       .returning();
     // Atıf yeniden hesaplansın.
-    await this.metrics.requestRecompute(orgId, storeId);
+    await this.metrics.requestRecompute(storeId, channelId);
     return this.toDto(row);
   }
 
-  async remove(orgId: string, storeId: string, id: string): Promise<void> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+  async remove(storeId: string, channelId: string, id: string): Promise<void> {
+    await assertStoreInOrg(this.db, storeId, channelId);
     await this.db
       .delete(productAdLinks)
-      .where(and(eq(productAdLinks.id, id), eq(productAdLinks.storeId, storeId)));
-    await this.metrics.requestRecompute(orgId, storeId);
+      .where(and(eq(productAdLinks.id, id), eq(productAdLinks.channelId, channelId)));
+    await this.metrics.requestRecompute(storeId, channelId);
   }
 
   /** Eşleştirme UI'ı için seçilebilir reklam varlıkları (kampanya/adset/ad). */
   async adEntityOptions(
-    orgId: string,
     storeId: string,
+    channelId: string,
     provider?: AdProvider,
   ): Promise<AdEntityOption[]> {
-    await assertStoreInOrg(this.db, orgId, storeId);
-    const conds = [eq(adEntities.storeId, storeId)];
+    await assertStoreInOrg(this.db, storeId, channelId);
+    const conds = [eq(adEntities.channelId, channelId)];
     if (provider) conds.push(eq(adEntities.provider, provider));
     const rows = await this.db
       .select({
@@ -120,7 +120,7 @@ export class ProductLinksService {
   private toDto(r: typeof productAdLinks.$inferSelect): ProductAdLink {
     return {
       id: r.id,
-      storeId: r.storeId,
+      channelId: r.channelId,
       productExternalId: r.productExternalId,
       provider: r.provider as AdProvider,
       adEntityExternalId: r.adEntityExternalId,

@@ -7,18 +7,14 @@ import {
 } from "@nestjs/common";
 import type {
   LoginInput,
-  OrgSummary,
   RegisterInput,
   SessionResponse,
+  StoreView,
 } from "@churnify/shared";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
-import {
-  memberships,
-  organizations,
-  users,
-} from "../../database/schema/auth";
-import { slugify } from "../organizations/slug.util";
-import { OrganizationsService } from "../organizations/organizations.service";
+import { stores, users } from "../../database/schema/auth";
+import { slugify } from "../stores/slug.util";
+import { StoresService } from "../stores/stores.service";
 import { UsersService, type UserRow } from "../users/users.service";
 import { TokenService } from "./token.service";
 
@@ -27,12 +23,16 @@ export interface IssuedSession {
   refreshToken: string;
 }
 
+function toStoreView(row: typeof stores.$inferSelect): StoreView {
+  return { id: row.id, name: row.name, slug: row.slug };
+}
+
 @Injectable()
 export class AuthService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly users: UsersService,
-    private readonly orgs: OrganizationsService,
+    private readonly orgs: StoresService,
     private readonly tokens: TokenService,
   ) {}
 
@@ -42,31 +42,22 @@ export class AuthService {
       throw new ConflictException("Bu e-posta ile bir hesap zaten var");
     }
     const passwordHash = await argonHash(input.password);
-    const orgName =
-      input.organizationName?.trim() || `${input.name} Organizasyonu`;
+    const storeName = input.storeName?.trim() || `${input.name} Mağazası`;
 
-    const { user, org } = await this.db.transaction(async (tx) => {
+    const { user, store } = await this.db.transaction(async (tx) => {
       const [u] = await tx
         .insert(users)
         .values({ email, passwordHash, name: input.name })
         .returning();
-      const [o] = await tx
-        .insert(organizations)
-        .values({ name: orgName, slug: slugify(orgName) })
+      // Açılışta tek varsayılan mağaza (store) — kullanıcı sonradan ekleyebilir.
+      const [s] = await tx
+        .insert(stores)
+        .values({ ownerUserId: u.id, name: storeName, slug: slugify(storeName) })
         .returning();
-      await tx
-        .insert(memberships)
-        .values({ organizationId: o.id, userId: u.id, role: "owner" });
-      return { user: u, org: o };
+      return { user: u, store: s };
     });
 
-    const activeOrg: OrgSummary = {
-      id: org.id,
-      name: org.name,
-      slug: org.slug,
-      role: "owner",
-    };
-    return this.buildSession(user, activeOrg);
+    return this.buildSession(user, toStoreView(store));
   }
 
   async login(input: LoginInput): Promise<IssuedSession> {
@@ -75,24 +66,24 @@ export class AuthService {
     if (!user || !ok) {
       throw new UnauthorizedException("E-posta veya parola hatalı");
     }
-    const orgs = await this.orgs.listForUser(user.id);
-    return this.buildSession(user, orgs[0] ?? null);
+    const stores = await this.orgs.listForUser(user.id);
+    return this.buildSession(user, stores[0] ?? null);
   }
 
   async refresh(rawRefresh: string): Promise<IssuedSession> {
-    const { userId, activeOrgId, newRaw } =
+    const { userId, activeStoreId, newRaw } =
       await this.tokens.rotateRefreshToken(rawRefresh);
     const user = await this.users.findById(userId);
     if (!user) throw new UnauthorizedException("Oturum geçersiz");
 
-    const activeOrg = await this.resolveActiveOrg(userId, activeOrgId);
+    const activeStore = await this.resolveActiveStore(userId, activeStoreId);
     const accessToken = this.tokens.signAccessToken({
       sub: user.id,
       email: user.email,
-      org: activeOrg ? { id: activeOrg.id, role: activeOrg.role } : undefined,
+      org: activeStore ? { id: activeStore.id } : undefined,
     });
     return {
-      session: { accessToken, user: toAuthUser(user), activeOrg },
+      session: { accessToken, user: toAuthUser(user), activeStore },
       refreshToken: newRaw,
     };
   }
@@ -106,67 +97,59 @@ export class AuthService {
     if (!user) throw new UnauthorizedException();
     return {
       user: toAuthUser(user),
-      organizations: await this.orgs.listForUser(userId),
+      stores: await this.orgs.listForUser(userId),
     };
   }
 
-  async switchOrg(
+  async switchStore(
     userId: string,
-    orgId: string,
+    storeId: string,
     rawRefresh: string | null,
-  ): Promise<{ accessToken: string; activeOrg: OrgSummary }> {
-    const role = await this.orgs.getRole(userId, orgId);
-    if (!role) throw new UnauthorizedException("Bu organizasyona erişiminiz yok");
-    if (rawRefresh) await this.tokens.setActiveOrg(rawRefresh, orgId);
+  ): Promise<{ accessToken: string; activeStore: StoreView }> {
+    const owns = await this.orgs.ownsStore(userId, storeId);
+    if (!owns) throw new UnauthorizedException("Bu mağazaya erişiminiz yok");
+    if (rawRefresh) await this.tokens.setActiveStore(rawRefresh, storeId);
 
-    const org = await this.orgs.getById(orgId);
+    const store = await this.orgs.getById(storeId);
     const user = await this.users.findById(userId);
-    if (!org || !user) throw new UnauthorizedException();
+    if (!store || !user) throw new UnauthorizedException();
 
-    const activeOrg: OrgSummary = {
-      id: org.id,
-      name: org.name,
-      slug: org.slug,
-      role,
-    };
+    const activeStore = toStoreView(store);
     const accessToken = this.tokens.signAccessToken({
       sub: userId,
       email: user.email,
-      org: { id: orgId, role },
+      org: { id: storeId },
     });
-    return { accessToken, activeOrg };
+    return { accessToken, activeStore };
   }
 
-  private async resolveActiveOrg(
+  private async resolveActiveStore(
     userId: string,
-    preferredOrgId: string | null,
-  ): Promise<OrgSummary | null> {
-    if (preferredOrgId) {
-      const role = await this.orgs.getRole(userId, preferredOrgId);
-      const org = role ? await this.orgs.getById(preferredOrgId) : undefined;
-      if (org && role) {
-        return { id: org.id, name: org.name, slug: org.slug, role };
-      }
+    preferredStoreId: string | null,
+  ): Promise<StoreView | null> {
+    if (preferredStoreId && (await this.orgs.ownsStore(userId, preferredStoreId))) {
+      const store = await this.orgs.getById(preferredStoreId);
+      if (store) return toStoreView(store);
     }
-    const orgs = await this.orgs.listForUser(userId);
-    return orgs[0] ?? null;
+    const stores = await this.orgs.listForUser(userId);
+    return stores[0] ?? null;
   }
 
   private async buildSession(
     user: UserRow,
-    activeOrg: OrgSummary | null,
+    activeStore: StoreView | null,
   ): Promise<IssuedSession> {
     const accessToken = this.tokens.signAccessToken({
       sub: user.id,
       email: user.email,
-      org: activeOrg ? { id: activeOrg.id, role: activeOrg.role } : undefined,
+      org: activeStore ? { id: activeStore.id } : undefined,
     });
     const refreshToken = await this.tokens.issueRefreshToken(
       user.id,
-      activeOrg?.id ?? null,
+      activeStore?.id ?? null,
     );
     return {
-      session: { accessToken, user: toAuthUser(user), activeOrg },
+      session: { accessToken, user: toAuthUser(user), activeStore },
       refreshToken,
     };
   }

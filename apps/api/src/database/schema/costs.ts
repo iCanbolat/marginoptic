@@ -13,8 +13,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { organizations } from "./auth";
-import { stores } from "./stores";
+import { stores } from "./auth";
+import { channels } from "./channels";
 
 /** Para alanları için ortak tip (sales.ts ile aynı): 20 basamak / 4 ondalık. */
 const money = (name: string) => numeric(name, { precision: 20, scale: 4 });
@@ -55,9 +55,9 @@ export const cogsRules = pgTable(
   "cogs_rules",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     scope: cogsScope("scope").notNull(),
     matchValue: varchar("match_value", { length: 255 }),
     // ISO-3166-1 alpha-2 (varış ülkesi); null = tüm ülkeler.
@@ -79,11 +79,11 @@ export const cogsRules = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("idx_cogs_lookup").on(t.storeId, t.scope, t.matchValue),
+    index("idx_cogs_lookup").on(t.channelId, t.scope, t.matchValue),
     // CSV/manuel tekrar import'ta idempotent upsert için "açık uçlu varsayılan kural"
     // anahtarı: (store, scope, matchValue) tek olmalı.
     uniqueIndex("uq_cogs_default_rule")
-      .on(t.storeId, t.scope, t.matchValue)
+      .on(t.channelId, t.scope, t.matchValue)
       .where(
         sql`${t.effectiveFrom} is null and ${t.country} is null and ${t.minQty} = 1`,
       ),
@@ -95,9 +95,9 @@ export const shippingCostRules = pgTable(
   "shipping_cost_rules",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 200 }).notNull(),
     country: varchar("country", { length: 2 }),
     minQty: integer("min_qty"),
@@ -118,7 +118,7 @@ export const shippingCostRules = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("idx_shipping_store").on(t.storeId)],
+  (t) => [index("idx_shipping_store").on(t.channelId)],
 );
 
 /** Ödeme/işlem ücreti kuralı (gateway bazlı yüzde + sabit). */
@@ -126,9 +126,9 @@ export const paymentFeeRules = pgTable(
   "payment_fee_rules",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     // null = tüm gateway'ler (varsayılan ücret).
     gateway: varchar("gateway", { length: 128 }),
     percentage: rate("percentage").notNull().default("0"),
@@ -144,7 +144,7 @@ export const paymentFeeRules = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("idx_payment_fee_store").on(t.storeId, t.gateway)],
+  (t) => [index("idx_payment_fee_store").on(t.channelId, t.gateway)],
 );
 
 /** Mağaza başına vergi davranışı (tek kayıt). */
@@ -152,9 +152,9 @@ export const taxConfig = pgTable(
   "tax_config",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     // pass_through: tahsil edilen vergi maliyet değil · borne: satıcı üstlenir (maliyet).
     salesTaxBorne: boolean("sales_tax_borne").notNull().default(false),
     // Net kâr üzerinden gelir vergisi oranı (opsiyonel; null = uygulanmaz).
@@ -166,7 +166,7 @@ export const taxConfig = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("uq_tax_config_store").on(t.storeId)],
+  (t) => [uniqueIndex("uq_tax_config_store").on(t.channelId)],
 );
 
 /** Özel gider (tek seferlik veya yinelenen); org-kapsamlı, mağazaya atfedilebilir. */
@@ -174,11 +174,11 @@ export const customExpenses = pgTable(
   "custom_expenses",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
+    storeId: uuid("store_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => stores.id, { onDelete: "cascade" }),
     // allocation = store iken zorunlu; spread iken null (org'a yayılır).
-    storeId: uuid("store_id").references(() => stores.id, {
+    channelId: uuid("channel_id").references(() => channels.id, {
       onDelete: "cascade",
     }),
     name: varchar("name", { length: 200 }).notNull(),
@@ -200,8 +200,8 @@ export const customExpenses = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("idx_custom_expense_org").on(t.organizationId),
-    index("idx_custom_expense_store").on(t.storeId),
+    index("idx_custom_expense_org").on(t.storeId),
+    index("idx_custom_expense_store").on(t.channelId),
   ],
 );
 
@@ -216,9 +216,9 @@ export const expenseAllocations = pgTable(
     customExpenseId: uuid("custom_expense_id")
       .notNull()
       .references(() => customExpenses.id, { onDelete: "cascade" }),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     date: date("date").notNull(),
     amount: money("amount").notNull(),
     currency: varchar("currency", { length: 3 }).notNull(),
@@ -228,7 +228,7 @@ export const expenseAllocations = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_expense_alloc").on(t.customExpenseId, t.storeId, t.date),
-    index("idx_expense_alloc_store_date").on(t.storeId, t.date),
+    uniqueIndex("uq_expense_alloc").on(t.customExpenseId, t.channelId, t.date),
+    index("idx_expense_alloc_store_date").on(t.channelId, t.date),
   ],
 );

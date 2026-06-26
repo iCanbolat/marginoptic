@@ -31,7 +31,7 @@ export type {
   ExpenseAllocation,
   ExpenseRecurrence,
   ExpenseType,
-  StoreSummary,
+  ChannelSummary,
 } from "@churnify/shared";
 
 import type {

@@ -88,8 +88,8 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
 
 export function ApiKeysPage() {
   const qc = useQueryClient();
-  const activeOrg = useAuthStore((s) => s.activeOrg);
-  const canManage = activeOrg?.role === "owner" || activeOrg?.role === "admin";
+  const activeStore = useAuthStore((s) => s.activeStore);
+  const canManage = true;
 
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<McpScope[]>([...MCP_SCOPES]);
@@ -157,7 +157,7 @@ export function ApiKeysPage() {
           API Anahtarları
         </h1>
         <p className="text-sm text-muted-foreground">
-          Claude / ChatGPT gibi MCP istemcilerinin {activeOrg?.name} verilerine
+          Claude / ChatGPT gibi MCP istemcilerinin {activeStore?.name} verilerine
           salt-okunur erişimi için anahtar üret.
         </p>
       </div>

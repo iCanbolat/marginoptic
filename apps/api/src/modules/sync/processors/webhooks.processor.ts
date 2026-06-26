@@ -44,7 +44,7 @@ export class WebhooksProcessor extends WorkerHost {
       // Sipariş/iade değiştiyse etkilenen gün(ler)in metriklerini artımlı yeniden hesapla.
       if (effect && effect.dates.length > 0) {
         const sorted = [...effect.dates].sort();
-        await this.sync.enqueueMetricsRollup(effect.storeId, {
+        await this.sync.enqueueMetricsRollup(effect.channelId, {
           from: sorted[0]!,
           to: sorted[sorted.length - 1]!,
         });

@@ -12,8 +12,7 @@ import { HealthModule } from "./health/health.module";
 import { CryptoModule } from "./common/crypto/crypto.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
-import { RolesGuard } from "./modules/auth/guards/roles.guard";
-import { StoresModule } from "./modules/stores/stores.module";
+import { ChannelsModule } from "./modules/channels/channels.module";
 import { IntegrationsModule } from "./modules/integrations/integrations.module";
 import { IngestionModule } from "./modules/ingestion/ingestion.module";
 import { CostsModule } from "./modules/costs/costs.module";
@@ -64,7 +63,7 @@ import { TrackingModule } from "./modules/tracking/tracking.module";
     CryptoModule,
     HealthModule,
     AuthModule,
-    StoresModule,
+    ChannelsModule,
     IntegrationsModule,
     IngestionModule,
     CostsModule,
@@ -79,7 +78,6 @@ import { TrackingModule } from "./modules/tracking/tracking.module";
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AppModule {}

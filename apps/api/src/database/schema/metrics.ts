@@ -9,7 +9,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { stores } from "./stores";
+import { channels } from "./channels";
 
 /** Para alanları için ortak tip (sales/costs ile aynı): 20 basamak / 4 ondalık. */
 const money = (name: string) => numeric(name, { precision: 20, scale: 4 });
@@ -26,9 +26,9 @@ export const dailyStoreMetrics = pgTable(
   "daily_store_metrics",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     date: date("date").notNull(),
     currency: varchar("currency", { length: 3 }).notNull(),
     // Brüt ürün satışı (Σ satır price*qty); kargo geliri dahil değil.
@@ -52,8 +52,8 @@ export const dailyStoreMetrics = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_daily_metric_store_date").on(t.storeId, t.date),
-    index("idx_daily_metric_store_date").on(t.storeId, t.date),
+    uniqueIndex("uq_daily_metric_store_date").on(t.channelId, t.date),
+    index("idx_daily_metric_store_date").on(t.channelId, t.date),
   ],
 );
 
@@ -62,9 +62,9 @@ export const productProfitDaily = pgTable(
   "product_profit_daily",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     date: date("date").notNull(),
     // Satır kaleminden gelen doğal anahtar (Shopify ürün id'si).
     productExternalId: varchar("product_external_id", { length: 255 }).notNull(),
@@ -83,11 +83,11 @@ export const productProfitDaily = pgTable(
   },
   (t) => [
     uniqueIndex("uq_product_profit_store_product_date").on(
-      t.storeId,
+      t.channelId,
       t.productExternalId,
       t.date,
     ),
-    index("idx_product_profit_store_date").on(t.storeId, t.date),
+    index("idx_product_profit_store_date").on(t.channelId, t.date),
   ],
 );
 

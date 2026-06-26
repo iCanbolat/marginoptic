@@ -13,7 +13,7 @@ import {
   customExpenses,
   expenseAllocations,
 } from "../../database/schema/costs";
-import { stores } from "../../database/schema/stores";
+import { channels } from "../../database/schema/channels";
 import {
   MaterializeExpenseJob,
   QUEUE_RECURRING_EXPENSES,
@@ -25,8 +25,8 @@ type ExpenseRow = typeof customExpenses.$inferSelect;
 function toSummary(r: ExpenseRow): CustomExpenseSummary {
   return {
     id: r.id,
-    organizationId: r.organizationId,
     storeId: r.storeId,
+    channelId: r.channelId,
     name: r.name,
     category: r.category,
     type: r.type,
@@ -54,11 +54,11 @@ export class ExpensesService {
   ) {}
 
   async list(
-    orgId: string,
-    storeId?: string,
+    storeId: string,
+    channelId?: string,
   ): Promise<CustomExpenseSummary[]> {
-    const conds = [eq(customExpenses.organizationId, orgId)];
-    if (storeId) conds.push(eq(customExpenses.storeId, storeId));
+    const conds = [eq(customExpenses.storeId, storeId)];
+    if (channelId) conds.push(eq(customExpenses.channelId, channelId));
     const rows = await this.db
       .select()
       .from(customExpenses)
@@ -68,43 +68,43 @@ export class ExpensesService {
   }
 
   /** Giderin org'a ait olduğunu doğrular (yoksa 404); controller manuel tetikleme için. */
-  async assertOwned(orgId: string, id: string): Promise<void> {
-    await this.loadOwned(orgId, id);
+  async assertOwned(storeId: string, id: string): Promise<void> {
+    await this.loadOwned(storeId, id);
   }
 
   /** Giderin org'a ait olduğunu doğrular (yoksa 404). */
-  private async loadOwned(orgId: string, id: string): Promise<ExpenseRow> {
+  private async loadOwned(storeId: string, id: string): Promise<ExpenseRow> {
     const [row] = await this.db
       .select()
       .from(customExpenses)
       .where(
-        and(eq(customExpenses.id, id), eq(customExpenses.organizationId, orgId)),
+        and(eq(customExpenses.id, id), eq(customExpenses.storeId, storeId)),
       )
       .limit(1);
     if (!row) throw new NotFoundException("Gider bulunamadı");
     return row;
   }
 
-  /** storeId verildiyse org'a ait olduğunu doğrular. */
-  private async assertStoreOwned(orgId: string, storeId: string): Promise<void> {
+  /** channelId verildiyse org'a ait olduğunu doğrular. */
+  private async assertStoreOwned(storeId: string, channelId: string): Promise<void> {
     const [row] = await this.db
-      .select({ id: stores.id })
-      .from(stores)
-      .where(and(eq(stores.id, storeId), eq(stores.organizationId, orgId)))
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(eq(channels.id, channelId), eq(channels.storeId, storeId)))
       .limit(1);
     if (!row) throw new NotFoundException("Mağaza bulunamadı");
   }
 
   async create(
-    orgId: string,
+    storeId: string,
     dto: CustomExpenseInput,
   ): Promise<CustomExpenseSummary> {
-    if (dto.storeId) await this.assertStoreOwned(orgId, dto.storeId);
+    if (dto.channelId) await this.assertStoreOwned(storeId, dto.channelId);
     const [row] = await this.db
       .insert(customExpenses)
       .values({
-        organizationId: orgId,
-        storeId: dto.allocation === "store" ? (dto.storeId ?? null) : null,
+        storeId: storeId,
+        channelId: dto.allocation === "store" ? (dto.channelId ?? null) : null,
         name: dto.name,
         category: dto.category ?? null,
         type: dto.type,
@@ -123,11 +123,11 @@ export class ExpensesService {
   }
 
   async update(
-    orgId: string,
+    storeId: string,
     id: string,
     dto: CustomExpenseUpdate,
   ): Promise<CustomExpenseSummary> {
-    await this.loadOwned(orgId, id);
+    await this.loadOwned(storeId, id);
     const set: Partial<typeof customExpenses.$inferInsert> = {
       updatedAt: new Date(),
     };
@@ -143,7 +143,7 @@ export class ExpensesService {
       .update(customExpenses)
       .set(set)
       .where(
-        and(eq(customExpenses.id, id), eq(customExpenses.organizationId, orgId)),
+        and(eq(customExpenses.id, id), eq(customExpenses.storeId, storeId)),
       )
       .returning();
     if (!row) throw new NotFoundException("Gider bulunamadı");
@@ -156,25 +156,25 @@ export class ExpensesService {
     return toSummary(row);
   }
 
-  async remove(orgId: string, id: string): Promise<void> {
-    await this.loadOwned(orgId, id);
+  async remove(storeId: string, id: string): Promise<void> {
+    await this.loadOwned(storeId, id);
     await this.db
       .delete(customExpenses)
       .where(
-        and(eq(customExpenses.id, id), eq(customExpenses.organizationId, orgId)),
+        and(eq(customExpenses.id, id), eq(customExpenses.storeId, storeId)),
       );
   }
 
   async listAllocations(
-    orgId: string,
+    storeId: string,
     id: string,
     from: string,
     to: string,
   ): Promise<ExpenseAllocationRow[]> {
-    await this.loadOwned(orgId, id);
+    await this.loadOwned(storeId, id);
     const rows = await this.db
       .select({
-        storeId: expenseAllocations.storeId,
+        channelId: expenseAllocations.channelId,
         date: expenseAllocations.date,
         amount: expenseAllocations.amount,
         currency: expenseAllocations.currency,
@@ -186,7 +186,7 @@ export class ExpensesService {
           between(expenseAllocations.date, from, to),
         ),
       )
-      .orderBy(asc(expenseAllocations.date), asc(expenseAllocations.storeId));
+      .orderBy(asc(expenseAllocations.date), asc(expenseAllocations.channelId));
     return rows;
   }
 
@@ -206,18 +206,18 @@ export class ExpensesService {
 
   // ---- processor tarafından çağrılır (DB yazımı) ----
 
-  /** Hedef mağazalar: store → [storeId]; spread → org'un aktif mağazaları. */
+  /** Hedef mağazalar: store → [channelId]; spread → org'un aktif mağazaları. */
   private async targetStoreIds(expense: ExpenseRow): Promise<string[]> {
     if (expense.allocation === "store") {
-      return expense.storeId ? [expense.storeId] : [];
+      return expense.channelId ? [expense.channelId] : [];
     }
     const rows = await this.db
-      .select({ id: stores.id })
-      .from(stores)
+      .select({ id: channels.id })
+      .from(channels)
       .where(
         and(
-          eq(stores.organizationId, expense.organizationId),
-          eq(stores.status, "active"),
+          eq(channels.storeId, expense.storeId),
+          eq(channels.status, "active"),
         ),
       );
     return rows.map((r) => r.id);
@@ -263,7 +263,7 @@ export class ExpensesService {
         await tx.insert(expenseAllocations).values(
           allocations.map((a) => ({
             customExpenseId,
-            storeId: a.storeId,
+            channelId: a.channelId,
             date: a.date,
             amount: a.amount,
             currency: expense.currency,

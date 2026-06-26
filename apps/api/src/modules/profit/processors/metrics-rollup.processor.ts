@@ -10,8 +10,8 @@ import {
 
 /**
  * Gün+mağaza rollup'ını işler.
- * - Parent job (sync sonrası FlowProducer zinciri): `{ storeId }` → mağazayı tam hesapla.
- * - Artımlı (webhook): `{ storeId, from, to }` → yalnız o aralığı hesapla.
+ * - Parent job (sync sonrası FlowProducer zinciri): `{ channelId }` → mağazayı tam hesapla.
+ * - Artımlı (webhook): `{ channelId, from, to }` → yalnız o aralığı hesapla.
  * - Gece scheduler: `{}` → tüm aktif mağazaları tam hesapla.
  */
 @Processor(QUEUE_METRICS_ROLLUP)
@@ -39,16 +39,16 @@ export class MetricsRollupProcessor
   }
 
   async process(job: Job<MetricsRollupJob>): Promise<void> {
-    const { storeId, from, to } = job.data ?? {};
+    const { channelId, from, to } = job.data ?? {};
 
-    if (storeId && from && to) {
-      const days = await this.metrics.rollupStore(storeId, { from, to });
-      this.logger.log(`Artımlı rollup ${storeId} ${from}→${to}: ${days} gün`);
+    if (channelId && from && to) {
+      const days = await this.metrics.rollupStore(channelId, { from, to });
+      this.logger.log(`Artımlı rollup ${channelId} ${from}→${to}: ${days} gün`);
       return;
     }
-    if (storeId) {
-      const days = await this.metrics.rollupStore(storeId);
-      this.logger.log(`Tam rollup ${storeId}: ${days} gün`);
+    if (channelId) {
+      const days = await this.metrics.rollupStore(channelId);
+      this.logger.log(`Tam rollup ${channelId}: ${days} gün`);
       return;
     }
     const total = await this.metrics.rollupAllActive();

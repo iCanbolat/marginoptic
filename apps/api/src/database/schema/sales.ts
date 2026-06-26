@@ -10,15 +10,15 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { stores } from "./stores";
+import { channels } from "./channels";
 
 /** Para alanları için ortak tip: 20 basamak / 4 ondalık (Shopify string olarak döner). */
 const money = (name: string) => numeric(name, { precision: 20, scale: 4 });
 
 /**
  * Faz 3 — Shopify satış verisi (normalize).
- * Tüm tablolar `store_id` + sağlayıcı `external_id` ile tekil; idempotent upsert
- * `onConflictDoUpdate` ile (store_id, external_id) hedefine yazılır.
+ * Tüm tablolar `channel_id` + sağlayıcı `external_id` ile tekil; idempotent upsert
+ * `onConflictDoUpdate` ile (channel_id, external_id) hedefine yazılır.
  */
 
 /** Mağaza müşterisi. */
@@ -26,9 +26,9 @@ export const customers = pgTable(
   "customers",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     externalId: varchar("external_id", { length: 255 }).notNull(),
     email: varchar("email", { length: 320 }),
     firstName: varchar("first_name", { length: 200 }),
@@ -46,8 +46,8 @@ export const customers = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_customer_store_external").on(t.storeId, t.externalId),
-    index("idx_customer_store").on(t.storeId),
+    uniqueIndex("uq_customer_store_external").on(t.channelId, t.externalId),
+    index("idx_customer_store").on(t.channelId),
   ],
 );
 
@@ -56,9 +56,9 @@ export const products = pgTable(
   "products",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     externalId: varchar("external_id", { length: 255 }).notNull(),
     title: varchar("title", { length: 500 }).notNull(),
     handle: varchar("handle", { length: 500 }),
@@ -75,8 +75,8 @@ export const products = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_product_store_external").on(t.storeId, t.externalId),
-    index("idx_product_store").on(t.storeId),
+    uniqueIndex("uq_product_store_external").on(t.channelId, t.externalId),
+    index("idx_product_store").on(t.channelId),
   ],
 );
 
@@ -85,9 +85,9 @@ export const productVariants = pgTable(
   "product_variants",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     productId: uuid("product_id").references(() => products.id, {
       onDelete: "cascade",
     }),
@@ -107,9 +107,9 @@ export const productVariants = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_variant_store_external").on(t.storeId, t.externalId),
-    index("idx_variant_store").on(t.storeId),
-    index("idx_variant_sku").on(t.storeId, t.sku),
+    uniqueIndex("uq_variant_store_external").on(t.channelId, t.externalId),
+    index("idx_variant_store").on(t.channelId),
+    index("idx_variant_sku").on(t.channelId, t.sku),
   ],
 );
 
@@ -118,9 +118,9 @@ export const orders = pgTable(
   "orders",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     externalId: varchar("external_id", { length: 255 }).notNull(),
     name: varchar("name", { length: 64 }),
     email: varchar("email", { length: 320 }),
@@ -148,8 +148,8 @@ export const orders = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_order_store_external").on(t.storeId, t.externalId),
-    index("idx_order_store_processed").on(t.storeId, t.processedAt),
+    uniqueIndex("uq_order_store_external").on(t.channelId, t.externalId),
+    index("idx_order_store_processed").on(t.channelId, t.processedAt),
   ],
 );
 
@@ -161,9 +161,9 @@ export const orderLineItems = pgTable(
     orderId: uuid("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     externalId: varchar("external_id", { length: 255 }).notNull(),
     productExternalId: varchar("product_external_id", { length: 255 }),
     variantExternalId: varchar("variant_external_id", { length: 255 }),
@@ -175,9 +175,9 @@ export const orderLineItems = pgTable(
     totalAmount: money("total_amount"),
   },
   (t) => [
-    uniqueIndex("uq_line_item_store_external").on(t.storeId, t.externalId),
+    uniqueIndex("uq_line_item_store_external").on(t.channelId, t.externalId),
     index("idx_line_item_order").on(t.orderId),
-    index("idx_line_item_variant").on(t.storeId, t.variantExternalId),
+    index("idx_line_item_variant").on(t.channelId, t.variantExternalId),
   ],
 );
 
@@ -189,9 +189,9 @@ export const orderTransactions = pgTable(
     orderId: uuid("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     externalId: varchar("external_id", { length: 255 }).notNull(),
     kind: varchar("kind", { length: 32 }),
     status: varchar("status", { length: 32 }),
@@ -202,7 +202,7 @@ export const orderTransactions = pgTable(
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },
   (t) => [
-    uniqueIndex("uq_txn_store_external").on(t.storeId, t.externalId),
+    uniqueIndex("uq_txn_store_external").on(t.channelId, t.externalId),
     index("idx_txn_order").on(t.orderId),
   ],
 );
@@ -215,9 +215,9 @@ export const refunds = pgTable(
     orderId: uuid("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     externalId: varchar("external_id", { length: 255 }).notNull(),
     amount: money("amount"),
     shippingRefunded: money("shipping_refunded"),
@@ -227,7 +227,7 @@ export const refunds = pgTable(
     shopifyCreatedAt: timestamp("shopify_created_at", { withTimezone: true }),
   },
   (t) => [
-    uniqueIndex("uq_refund_store_external").on(t.storeId, t.externalId),
+    uniqueIndex("uq_refund_store_external").on(t.channelId, t.externalId),
     index("idx_refund_order").on(t.orderId),
   ],
 );

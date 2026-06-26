@@ -19,10 +19,9 @@ import {
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
+  type ActiveStore,
+  CurrentStore,
+} from "../auth/decorators/current-store.decorator";
 import { ProductLinksService } from "./product-links.service";
 
 const createPipe = new ZodValidationPipe(productAdLinkCreateSchema);
@@ -39,47 +38,45 @@ function parseProvider(raw: string | undefined): AdProvider | undefined {
  */
 @ApiTags("product-ad-links")
 @ApiBearerAuth()
-@Controller("stores/:storeId/product-ad-links")
+@Controller("channels/:channelId/product-ad-links")
 export class ProductLinksController {
   constructor(private readonly links: ProductLinksService) {}
 
   @Get()
   list(
-    @CurrentOrg() org: ActiveOrg,
-    @Param("storeId") storeId: string,
+    @CurrentStore() org: ActiveStore,
+    @Param("channelId") channelId: string,
     @Query("productExternalId") productExternalId?: string,
   ): Promise<ProductAdLink[]> {
-    return this.links.list(org.id, storeId, productExternalId);
+    return this.links.list(org.id, channelId, productExternalId);
   }
 
   /** Eşleştirilebilir reklam varlıkları (kampanya/adset/ad). */
   @Get("ad-entities")
   adEntities(
-    @CurrentOrg() org: ActiveOrg,
-    @Param("storeId") storeId: string,
+    @CurrentStore() org: ActiveStore,
+    @Param("channelId") channelId: string,
     @Query("provider") provider?: string,
   ): Promise<AdEntityOption[]> {
-    return this.links.adEntityOptions(org.id, storeId, parseProvider(provider));
+    return this.links.adEntityOptions(org.id, channelId, parseProvider(provider));
   }
 
-  @Roles("owner", "admin")
   @Post()
   create(
-    @CurrentOrg() org: ActiveOrg,
-    @Param("storeId") storeId: string,
+    @CurrentStore() org: ActiveStore,
+    @Param("channelId") channelId: string,
     @Body(createPipe) body: ProductAdLinkCreateInput,
   ): Promise<ProductAdLink> {
-    return this.links.create(org.id, storeId, body);
+    return this.links.create(org.id, channelId, body);
   }
 
-  @Roles("owner", "admin")
   @Delete(":id")
   @HttpCode(204)
   remove(
-    @CurrentOrg() org: ActiveOrg,
-    @Param("storeId") storeId: string,
+    @CurrentStore() org: ActiveStore,
+    @Param("channelId") channelId: string,
     @Param("id") id: string,
   ): Promise<void> {
-    return this.links.remove(org.id, storeId, id);
+    return this.links.remove(org.id, channelId, id);
   }
 }

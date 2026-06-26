@@ -10,7 +10,7 @@ import {
 
 /**
  * Amazon/eBay ürün-traffic'ini günlük yeniler (conversion rate kartı için).
- * Boş job → tüm aktif marketplace mağazaları; dolu `storeId` → tek mağaza.
+ * Boş job → tüm aktif marketplace mağazaları; dolu `channelId` → tek mağaza.
  */
 @Processor(QUEUE_TRAFFIC_SYNC)
 export class TrafficSyncProcessor
@@ -36,9 +36,9 @@ export class TrafficSyncProcessor
   }
 
   async process(job: Job<TrafficSyncJob>): Promise<void> {
-    const storeId = job.data?.storeId;
-    if (storeId) {
-      await this.traffic.syncMarketplaceTraffic(storeId);
+    const channelId = job.data?.channelId;
+    if (channelId) {
+      await this.traffic.syncMarketplaceTraffic(channelId);
       return;
     }
     const n = await this.traffic.syncAllMarketplaces();

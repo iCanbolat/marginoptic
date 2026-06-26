@@ -15,7 +15,7 @@ export class AdsIngestionService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
   async upsertInsights(
-    storeId: string,
+    channelId: string,
     connectionId: string,
     provider: AdProvider,
     result: AdInsightsResult,
@@ -26,7 +26,7 @@ export class AdsIngestionService {
       await this.db
         .insert(adEntities)
         .values({
-          storeId,
+          channelId,
           connectionId,
           provider,
           level: e.level,
@@ -39,7 +39,7 @@ export class AdsIngestionService {
           updatedAt: now,
         })
         .onConflictDoUpdate({
-          target: [adEntities.storeId, adEntities.provider, adEntities.externalId],
+          target: [adEntities.channelId, adEntities.provider, adEntities.externalId],
           set: {
             connectionId,
             level: e.level,
@@ -57,7 +57,7 @@ export class AdsIngestionService {
       await this.db
         .insert(adSpend)
         .values({
-          storeId,
+          channelId,
           connectionId,
           provider,
           date: s.date,
@@ -74,7 +74,7 @@ export class AdsIngestionService {
         })
         .onConflictDoUpdate({
           target: [
-            adSpend.storeId,
+            adSpend.channelId,
             adSpend.provider,
             adSpend.entityExternalId,
             adSpend.date,
@@ -95,13 +95,13 @@ export class AdsIngestionService {
     }
 
     // Ürün-seviyesi harcama (yalnız ürün-raporlu sağlayıcılar / manuel allokasyon
-    // sonrası). product_profit_daily ile (storeId, productExternalId, date) join olur.
+    // sonrası). product_profit_daily ile (channelId, productExternalId, date) join olur.
     const productSpend = result.productSpend ?? [];
     for (const p of productSpend) {
       await this.db
         .insert(productAdSpendDaily)
         .values({
-          storeId,
+          channelId,
           date: p.date,
           productExternalId: p.productExternalId,
           provider,
@@ -112,7 +112,7 @@ export class AdsIngestionService {
         })
         .onConflictDoUpdate({
           target: [
-            productAdSpendDaily.storeId,
+            productAdSpendDaily.channelId,
             productAdSpendDaily.provider,
             productAdSpendDaily.productExternalId,
             productAdSpendDaily.date,

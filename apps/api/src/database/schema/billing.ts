@@ -9,12 +9,13 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import type { PlanId, SubscriptionStatus } from "@churnify/shared";
-import { organizations } from "./auth";
+import { users } from "./auth";
 
 /**
  * Faz 9 — Faturalandırma (creem.io).
- * Org başına tek abonelik (`subscriptions`); webhook'lar idempotent işlenir (`billing_events`).
- * Gerçek tahsilat Creem'de; burada plan + durum + dönem bilgisi aynalanır (entitlement/gating).
+ * Kullanıcı (hesap) başına tek abonelik (`subscriptions`); webhook'lar idempotent işlenir
+ * (`billing_events`). Gerçek tahsilat Creem'de; burada plan + durum + dönem bilgisi
+ * aynalanır (entitlement/gating). Bir hesabın tüm mağazalarını kapsar.
  */
 
 export const billingPlan = pgEnum("billing_plan", ["basic", "pro"]);
@@ -34,11 +35,11 @@ export const subscriptions = pgTable(
   "subscriptions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // org başına tek satır
-    organizationId: uuid("organization_id")
+    // kullanıcı (hesap) başına tek satır
+    userId: uuid("user_id")
       .notNull()
       .unique()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     plan: billingPlan("plan").notNull().$type<PlanId>(),
     status: subscriptionStatus("status").notNull().$type<SubscriptionStatus>(),
     // Creem tarafı kimlikler
@@ -56,7 +57,7 @@ export const subscriptions = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("idx_subscription_org").on(t.organizationId)],
+  (t) => [index("idx_subscription_user").on(t.userId)],
 );
 
 /**
@@ -68,7 +69,7 @@ export const billingEvents = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     creemEventId: varchar("creem_event_id", { length: 255 }).notNull().unique(),
     eventType: varchar("event_type", { length: 120 }).notNull(),
-    organizationId: uuid("organization_id").references(() => organizations.id, {
+    userId: uuid("user_id").references(() => users.id, {
       onDelete: "set null",
     }),
     payload: jsonb("payload").notNull(),
@@ -76,5 +77,5 @@ export const billingEvents = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("idx_billing_event_org").on(t.organizationId)],
+  (t) => [index("idx_billing_event_user").on(t.userId)],
 );

@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const INTEGRATION_PROVIDERS = [
   "shopify",
-  "etsy",
   "ebay",
   "amazon",
   "meta_ads",
@@ -13,7 +12,7 @@ export const INTEGRATION_PROVIDERS = [
 ] as const;
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
 
-export const SALES_CHANNELS = ["shopify", "etsy", "ebay", "amazon"] as const;
+export const SALES_CHANNELS = ["shopify", "ebay", "amazon"] as const;
 export type SalesChannel = (typeof SALES_CHANNELS)[number];
 
 export const CONNECTION_STATUSES = [
@@ -36,17 +35,6 @@ export const shopifyInstallSchema = z.object({
     ),
 });
 export type ShopifyInstallInput = z.infer<typeof shopifyInstallSchema>;
-
-/** Etsy bağlama: mağaza adı/etiketi (OAuth canlıda Etsy'den çözülür; dev'de bu kullanılır). */
-export const etsyConnectSchema = z.object({
-  shop: z
-    .string()
-    .trim()
-    .min(2, "Mağaza adı en az 2 karakter")
-    .max(60)
-    .regex(/^[a-zA-Z0-9][a-zA-Z0-9 _-]*$/, "Harf, rakam, boşluk, tire/alt çizgi"),
-});
-export type EtsyConnectInput = z.infer<typeof etsyConnectSchema>;
 
 /** eBay bağlama: mağaza adı/etiketi (OAuth canlıda eBay'den çözülür; dev'de bu kullanılır). */
 export const ebayConnectSchema = z.object({
@@ -72,7 +60,7 @@ export type AmazonConnectInput = z.infer<typeof amazonConnectSchema>;
 
 // ---- response sözleşmeleri ----
 
-export interface StoreSummary {
+export interface ChannelSummary {
   id: string;
   channel: SalesChannel;
   name: string;
@@ -86,7 +74,7 @@ export interface ConnectionSummary {
   id: string;
   provider: IntegrationProvider;
   status: ConnectionStatus;
-  storeId: string | null;
+  channelId: string | null;
   externalAccountId: string | null;
   scopes: string | null;
   createdAt: string;

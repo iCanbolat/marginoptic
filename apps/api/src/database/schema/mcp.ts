@@ -7,7 +7,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import type { McpScope } from "@churnify/shared";
-import { organizations, users } from "./auth";
+import { stores, users } from "./auth";
 
 /**
  * Faz 8 — MCP per-org API key'leri.
@@ -18,9 +18,9 @@ export const apiKeys = pgTable(
   "api_keys",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
+    storeId: uuid("store_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => stores.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 120 }).notNull(),
     // sha256(rawKey) hex — ham anahtar asla saklanmaz
     keyHash: varchar("key_hash", { length: 64 }).notNull().unique(),
@@ -36,5 +36,5 @@ export const apiKeys = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("idx_api_key_org").on(t.organizationId)],
+  (t) => [index("idx_api_key_org").on(t.storeId)],
 );

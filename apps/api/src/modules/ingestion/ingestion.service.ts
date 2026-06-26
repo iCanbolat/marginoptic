@@ -19,7 +19,7 @@ import type {
 
 /**
  * Normalize edilmiş satış verisini DB'ye idempotent yazar.
- * Tüm yazımlar (store_id, external_id) hedefiyle `onConflictDoUpdate` —
+ * Tüm yazımlar (channel_id, external_id) hedefiyle `onConflictDoUpdate` —
  * tekrarlı webhook/backfill çift kayıt üretmez.
  */
 @Injectable()
@@ -27,13 +27,13 @@ export class IngestionService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
   /** Sipariş + satırları + hareketleri + iadeleri tek transaction'da yazar. */
-  async upsertOrder(storeId: string, o: NormalizedOrder): Promise<string> {
+  async upsertOrder(channelId: string, o: NormalizedOrder): Promise<string> {
     return this.db.transaction(async (tx) => {
       const now = new Date();
       const [row] = await tx
         .insert(orders)
         .values({
-          storeId,
+          channelId,
           externalId: o.externalId,
           name: o.name,
           email: o.email,
@@ -56,7 +56,7 @@ export class IngestionService {
           updatedAt: now,
         })
         .onConflictDoUpdate({
-          target: [orders.storeId, orders.externalId],
+          target: [orders.channelId, orders.externalId],
           set: {
             name: o.name,
             email: o.email,
@@ -87,7 +87,7 @@ export class IngestionService {
         await tx.insert(orderLineItems).values(
           o.lineItems.map((li) => ({
             orderId,
-            storeId,
+            channelId,
             externalId: li.externalId,
             productExternalId: li.productExternalId,
             variantExternalId: li.variantExternalId,
@@ -107,7 +107,7 @@ export class IngestionService {
           .insert(orderTransactions)
           .values({
             orderId,
-            storeId,
+            channelId,
             externalId: t.externalId,
             kind: t.kind,
             status: t.status,
@@ -118,7 +118,7 @@ export class IngestionService {
             processedAt: t.processedAt,
           })
           .onConflictDoUpdate({
-            target: [orderTransactions.storeId, orderTransactions.externalId],
+            target: [orderTransactions.channelId, orderTransactions.externalId],
             set: {
               kind: t.kind,
               status: t.status,
@@ -132,7 +132,7 @@ export class IngestionService {
       }
 
       for (const r of o.refunds) {
-        await this.insertRefund(tx, storeId, orderId, r);
+        await this.insertRefund(tx, channelId, orderId, r);
       }
 
       return orderId;
@@ -140,10 +140,10 @@ export class IngestionService {
   }
 
   /** Sipariş + ilişkili satır/hareket/iadeleri toplu yazar; yazılan sipariş sayısını döner. */
-  async upsertOrders(storeId: string, list: NormalizedOrder[]): Promise<number> {
+  async upsertOrders(channelId: string, list: NormalizedOrder[]): Promise<number> {
     let count = 0;
     for (const o of list) {
-      await this.upsertOrder(storeId, o);
+      await this.upsertOrder(channelId, o);
       count += 1;
     }
     return count;
@@ -151,7 +151,7 @@ export class IngestionService {
 
   /** Bağımsız `refunds/create` webhook'u: ilgili siparişe bağla (yoksa atla). */
   async upsertRefund(
-    storeId: string,
+    channelId: string,
     orderExternalId: string | null,
     r: NormalizedRefund,
   ): Promise<boolean> {
@@ -160,21 +160,21 @@ export class IngestionService {
       .select({ id: orders.id })
       .from(orders)
       .where(
-        and(eq(orders.storeId, storeId), eq(orders.externalId, orderExternalId)),
+        and(eq(orders.channelId, channelId), eq(orders.externalId, orderExternalId)),
       )
       .limit(1);
     if (!order) return false;
-    await this.insertRefund(this.db, storeId, order.id, r);
+    await this.insertRefund(this.db, channelId, order.id, r);
     return true;
   }
 
-  async upsertProduct(storeId: string, p: NormalizedProduct): Promise<void> {
+  async upsertProduct(channelId: string, p: NormalizedProduct): Promise<void> {
     await this.db.transaction(async (tx) => {
       const now = new Date();
       const [row] = await tx
         .insert(products)
         .values({
-          storeId,
+          channelId,
           externalId: p.externalId,
           title: p.title,
           handle: p.handle,
@@ -186,7 +186,7 @@ export class IngestionService {
           updatedAt: now,
         })
         .onConflictDoUpdate({
-          target: [products.storeId, products.externalId],
+          target: [products.channelId, products.externalId],
           set: {
             title: p.title,
             handle: p.handle,
@@ -203,7 +203,7 @@ export class IngestionService {
         await tx
           .insert(productVariants)
           .values({
-            storeId,
+            channelId,
             productId: row.id,
             externalId: v.externalId,
             externalProductId: v.externalProductId ?? p.externalId,
@@ -216,7 +216,7 @@ export class IngestionService {
             updatedAt: now,
           })
           .onConflictDoUpdate({
-            target: [productVariants.storeId, productVariants.externalId],
+            target: [productVariants.channelId, productVariants.externalId],
             set: {
               productId: row.id,
               externalProductId: v.externalProductId ?? p.externalId,
@@ -233,19 +233,19 @@ export class IngestionService {
   }
 
   async upsertProducts(
-    storeId: string,
+    channelId: string,
     list: NormalizedProduct[],
   ): Promise<number> {
-    for (const p of list) await this.upsertProduct(storeId, p);
+    for (const p of list) await this.upsertProduct(channelId, p);
     return list.length;
   }
 
-  async upsertCustomer(storeId: string, c: NormalizedCustomer): Promise<void> {
+  async upsertCustomer(channelId: string, c: NormalizedCustomer): Promise<void> {
     const now = new Date();
     await this.db
       .insert(customers)
       .values({
-        storeId,
+        channelId,
         externalId: c.externalId,
         email: c.email,
         firstName: c.firstName,
@@ -258,7 +258,7 @@ export class IngestionService {
         updatedAt: now,
       })
       .onConflictDoUpdate({
-        target: [customers.storeId, customers.externalId],
+        target: [customers.channelId, customers.externalId],
         set: {
           email: c.email,
           firstName: c.firstName,
@@ -273,16 +273,16 @@ export class IngestionService {
   }
 
   async upsertCustomers(
-    storeId: string,
+    channelId: string,
     list: NormalizedCustomer[],
   ): Promise<number> {
-    for (const c of list) await this.upsertCustomer(storeId, c);
+    for (const c of list) await this.upsertCustomer(channelId, c);
     return list.length;
   }
 
   private async insertRefund(
     db: DrizzleDB | Parameters<Parameters<DrizzleDB["transaction"]>[0]>[0],
-    storeId: string,
+    channelId: string,
     orderId: string,
     r: NormalizedRefund,
   ): Promise<void> {
@@ -290,7 +290,7 @@ export class IngestionService {
       .insert(refunds)
       .values({
         orderId,
-        storeId,
+        channelId,
         externalId: r.externalId,
         amount: r.amount,
         shippingRefunded: r.shippingRefunded,
@@ -300,7 +300,7 @@ export class IngestionService {
         shopifyCreatedAt: r.shopifyCreatedAt,
       })
       .onConflictDoUpdate({
-        target: [refunds.storeId, refunds.externalId],
+        target: [refunds.channelId, refunds.externalId],
         set: {
           amount: r.amount,
           shippingRefunded: r.shippingRefunded,

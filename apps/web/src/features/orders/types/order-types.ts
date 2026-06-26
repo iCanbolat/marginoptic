@@ -2,7 +2,7 @@
 export type {
   OrderRow,
   Paginated,
-  StoreSummary,
+  ChannelSummary,
   StoreSyncStatus,
 } from "@churnify/shared";
 

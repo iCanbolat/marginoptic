@@ -10,7 +10,7 @@ import { AppShell } from "@/components/app-shell";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { LoginPage } from "@/features/auth/login-page";
 import { RegisterPage } from "@/features/auth/register-page";
-import { MembersPage } from "@/features/settings/members-page";
+import { StoresPage } from "@/features/settings/stores-page";
 import { ApiKeysPage } from "@/features/settings/api-keys-page";
 import { BillingPage } from "@/features/billing/billing-page";
 import { IntegrationsPage } from "@/features/integrations/integrations-page";
@@ -70,10 +70,10 @@ const adsRoute = createRoute({
   component: AdsPage,
 });
 
-const membersRoute = createRoute({
+const storesRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
-  path: "/settings/members",
-  component: MembersPage,
+  path: "/settings/stores",
+  component: StoresPage,
 });
 
 const apiKeysRoute = createRoute({
@@ -123,7 +123,7 @@ const routeTree = rootRoute.addChildren([
     productsRoute,
     costsRoute,
     adsRoute,
-    membersRoute,
+    storesRoute,
     apiKeysRoute,
     billingRoute,
     chartsPreviewRoute,

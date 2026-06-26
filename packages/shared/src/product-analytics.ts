@@ -65,7 +65,7 @@ export type ProductTableSort = (typeof PRODUCT_TABLE_SORTS)[number];
 
 /** Ürün tablosu satırı: kâr + ürün-bazlı ROAS/harcama + dönüşüm. */
 export interface ProductAnalyticsRow {
-  storeId: string;
+  channelId: string;
   storeName: string;
   channel: ProductAnalyticsChannel;
   productExternalId: string;
@@ -124,7 +124,7 @@ export interface AdEntityOption {
 /** Mevcut bir ürün↔reklam eşleştirmesi. */
 export interface ProductAdLink {
   id: string;
-  storeId: string;
+  channelId: string;
   productExternalId: string;
   provider: AdProvider;
   adEntityExternalId: string;
@@ -169,7 +169,7 @@ export type PixelEventInput = z.infer<typeof pixelEventSchema>;
 
 /** Mağaza dönüşüm izleme bilgisi (Web Pixel ayarına yapıştırılacak Account ID). */
 export interface StoreTrackingInfo {
-  storeId: string;
+  channelId: string;
   /** Web Pixel'in "MarginOptic Account ID" ayarına girilecek değer. */
   accountId: string;
 }

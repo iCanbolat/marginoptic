@@ -1,9 +1,9 @@
 import { NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import type { DrizzleDB } from "../../database/database.module";
-import { stores } from "../../database/schema/stores";
+import { channels } from "../../database/schema/channels";
 
-export interface OrgStore {
+export interface StoreChannel {
   id: string;
   name: string;
   currency: string;
@@ -15,20 +15,20 @@ export interface OrgStore {
  * doluysa yalnız istenenler — istenen bir mağaza org'a ait değilse 404.
  * Raporlama para birimi ilk mağazanın para birimidir (çok-para FX dönüşümü yok).
  */
-export async function resolveOrgStores(
+export async function resolveStoreChannels(
   db: DrizzleDB,
-  orgId: string,
+  storeId: string,
   requestedIds: string[],
-): Promise<OrgStore[]> {
+): Promise<StoreChannel[]> {
   const all = await db
     .select({
-      id: stores.id,
-      name: stores.name,
-      currency: stores.currency,
-      channel: stores.channel,
+      id: channels.id,
+      name: channels.name,
+      currency: channels.currency,
+      channel: channels.channel,
     })
-    .from(stores)
-    .where(eq(stores.organizationId, orgId));
+    .from(channels)
+    .where(eq(channels.storeId, storeId));
 
   if (requestedIds.length === 0) return all;
 
@@ -37,5 +37,5 @@ export async function resolveOrgStores(
   if (missing.length > 0) {
     throw new NotFoundException("Mağaza bulunamadı");
   }
-  return requestedIds.map((id) => byId.get(id) as OrgStore);
+  return requestedIds.map((id) => byId.get(id) as StoreChannel);
 }

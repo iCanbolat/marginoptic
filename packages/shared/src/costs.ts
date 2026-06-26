@@ -100,7 +100,7 @@ export type CogsRuleUpdate = z.infer<typeof cogsRuleUpdateSchema>;
 
 export interface CogsRuleSummary {
   id: string;
-  storeId: string;
+  channelId: string;
   scope: CogsScope;
   matchValue: string | null;
   country: string | null;
@@ -173,7 +173,7 @@ export type ShippingRuleBatchInput = z.infer<typeof shippingRuleBatchInputSchema
 
 export interface ShippingRuleSummary {
   id: string;
-  storeId: string;
+  channelId: string;
   name: string;
   country: string | null;
   minQty: number | null;
@@ -202,7 +202,7 @@ export type PaymentFeeRuleInput = z.infer<typeof paymentFeeRuleInputSchema>;
 
 export interface PaymentFeeRuleSummary {
   id: string;
-  storeId: string;
+  channelId: string;
   gateway: string | null;
   percentage: string;
   fixedFee: string;
@@ -221,7 +221,7 @@ export const taxConfigInputSchema = z.object({
 export type TaxConfigInput = z.infer<typeof taxConfigInputSchema>;
 
 export interface TaxConfigSummary {
-  storeId: string;
+  channelId: string;
   salesTaxBorne: boolean;
   incomeTaxRate: string | null;
   updatedAt: string;
@@ -245,7 +245,7 @@ export const customExpenseInputSchema = z
     type: z.enum(EXPENSE_TYPES),
     recurrence: z.enum(EXPENSE_RECURRENCES).optional(),
     allocation: z.enum(EXPENSE_ALLOCATIONS).default("store"),
-    storeId: z.string().uuid().optional(),
+    channelId: z.string().uuid().optional(),
     amount: moneyInput,
     currency: currency.default("USD"),
     startDate: isoDate,
@@ -256,9 +256,9 @@ export const customExpenseInputSchema = z
     message: "recurring gider için recurrence zorunlu",
     path: ["recurrence"],
   })
-  .refine((v) => v.allocation !== "store" || !!v.storeId, {
-    message: "allocation=store için storeId zorunlu",
-    path: ["storeId"],
+  .refine((v) => v.allocation !== "store" || !!v.channelId, {
+    message: "allocation=store için channelId zorunlu",
+    path: ["channelId"],
   })
   .refine((v) => v.endDate == null || v.endDate >= v.startDate, {
     message: "endDate, startDate'den önce olamaz",
@@ -279,8 +279,8 @@ export type CustomExpenseUpdate = z.infer<typeof customExpenseUpdateSchema>;
 
 export interface CustomExpenseSummary {
   id: string;
-  organizationId: string;
-  storeId: string | null;
+  storeId: string;
+  channelId: string | null;
   name: string;
   category: string | null;
   type: ExpenseType;
@@ -296,7 +296,7 @@ export interface CustomExpenseSummary {
 
 /** Gün+mağaza seviyesine materialize edilmiş gider satırı (allocations görünümü). */
 export interface ExpenseAllocationRow {
-  storeId: string;
+  channelId: string;
   date: string;
   amount: string;
   currency: string;

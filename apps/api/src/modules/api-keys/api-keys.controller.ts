@@ -17,11 +17,10 @@ import {
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import type { AuthContext } from "../auth/auth.types";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
+  type ActiveStore,
+  CurrentStore,
+} from "../auth/decorators/current-store.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
 import { ApiKeysService } from "./api-keys.service";
 
 /**
@@ -35,15 +34,13 @@ export class ApiKeysController {
   constructor(private readonly apiKeys: ApiKeysService) {}
 
   @Get()
-  @Roles("owner", "admin")
-  list(@CurrentOrg() org: ActiveOrg): Promise<ApiKeySummary[]> {
+  list(@CurrentStore() org: ActiveStore): Promise<ApiKeySummary[]> {
     return this.apiKeys.list(org.id);
   }
 
   @Post()
-  @Roles("owner", "admin")
   create(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @CurrentUser() user: AuthContext,
     @Body(new ZodValidationPipe(apiKeyCreateSchema)) dto: ApiKeyCreateInput,
   ): Promise<ApiKeyCreatedResponse> {
@@ -51,10 +48,9 @@ export class ApiKeysController {
   }
 
   @Delete(":id")
-  @Roles("owner", "admin")
   @HttpCode(204)
   revoke(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("id") id: string,
   ): Promise<void> {
     return this.apiKeys.revoke(org.id, id);

@@ -14,13 +14,13 @@ import { dailyStoreMetrics } from "../../database/schema/metrics";
 import { orders } from "../../database/schema/sales";
 import { REDIS } from "../../redis/redis.module";
 import { f4, num } from "./analytics-math";
-import { resolveOrgStores } from "./org-stores";
+import { resolveStoreChannels } from "./store-channels";
 
 const CACHE_TTL = 300;
 
 interface OrderFact {
-  customerKey: string; // storeId|customerExternalId
-  storeId: string;
+  customerKey: string; // channelId|customerExternalId
+  channelId: string;
   customerExternalId: string;
   email: string | null;
   date: string; // YYYY-MM-DD
@@ -36,7 +36,7 @@ const monthsDiff = (a: string, b: string): number => {
 
 /**
  * Faz 7 — Müşteri analitiği: LTV (müşteri başına ortalama ciro), CAC (reklam/yeni
- * müşteri) ve kohort tutundurma. Çok-mağaza müşteri kimliği `storeId:customerExternalId`
+ * müşteri) ve kohort tutundurma. Çok-mağaza müşteri kimliği `channelId:customerExternalId`
  * ile ayrıştırılır. Cohort tam geçmiş gerektirdiğinden mağazanın tüm siparişleri okunur.
  */
 @Injectable()
@@ -46,11 +46,11 @@ export class CustomersService {
     @Inject(REDIS) private readonly redis: Redis,
   ) {}
 
-  async ltv(orgId: string, filter: AnalyticsFilter): Promise<CustomerLtvResponse> {
-    return this.cached(orgId, "ltv", filter, async () => {
-      const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-      const currency = stores[0]?.currency ?? "USD";
-      const facts = await this.loadOrders(stores.map((s) => s.id));
+  async ltv(storeId: string, filter: AnalyticsFilter): Promise<CustomerLtvResponse> {
+    return this.cached(storeId, "ltv", filter, async () => {
+      const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+      const currency = channels[0]?.currency ?? "USD";
+      const facts = await this.loadOrders(channels.map((s) => s.id));
 
       // Müşteri başına ilk sipariş (tüm geçmiş) + aralık-içi aktivite.
       const firstOrder = new Map<string, string>();
@@ -64,7 +64,7 @@ export class CustomersService {
       );
       const perCustomer = new Map<
         string,
-        { storeId: string; cust: string; email: string | null; orders: number; revenue: number }
+        { channelId: string; cust: string; email: string | null; orders: number; revenue: number }
       >();
       let totalOrders = 0;
       let totalRevenue = 0;
@@ -74,7 +74,7 @@ export class CustomersService {
         let c = perCustomer.get(f.customerKey);
         if (!c) {
           c = {
-            storeId: f.storeId,
+            channelId: f.channelId,
             cust: f.customerExternalId,
             email: f.email,
             orders: 0,
@@ -99,7 +99,7 @@ export class CustomersService {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 10)
         .map((c) => ({
-          storeId: c.storeId,
+          channelId: c.channelId,
           customerExternalId: c.cust,
           email: c.email,
           orders: c.orders,
@@ -129,11 +129,11 @@ export class CustomersService {
     });
   }
 
-  async cac(orgId: string, filter: AnalyticsFilter): Promise<CustomerCacResponse> {
-    return this.cached(orgId, "cac", filter, async () => {
-      const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-      const ids = stores.map((s) => s.id);
-      const currency = stores[0]?.currency ?? "USD";
+  async cac(storeId: string, filter: AnalyticsFilter): Promise<CustomerCacResponse> {
+    return this.cached(storeId, "cac", filter, async () => {
+      const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+      const ids = channels.map((s) => s.id);
+      const currency = channels[0]?.currency ?? "USD";
 
       const facts = await this.loadOrders(ids);
       const firstOrder = new Map<string, string>();
@@ -159,12 +159,12 @@ export class CustomersService {
   }
 
   async cohorts(
-    orgId: string,
+    storeId: string,
     filter: AnalyticsFilter,
   ): Promise<CustomerCohortsResponse> {
-    return this.cached(orgId, "cohorts", filter, async () => {
-      const stores = await resolveOrgStores(this.db, orgId, filter.storeIds);
-      const facts = await this.loadOrders(stores.map((s) => s.id));
+    return this.cached(storeId, "cohorts", filter, async () => {
+      const channels = await resolveStoreChannels(this.db, storeId, filter.storeIds);
+      const facts = await this.loadOrders(channels.map((s) => s.id));
 
       const firstMonth = new Map<string, string>();
       for (const f of facts) {
@@ -238,7 +238,7 @@ export class CustomersService {
     if (storeIds.length === 0) return [];
     const rows = await this.db
       .select({
-        storeId: orders.storeId,
+        channelId: orders.channelId,
         customerExternalId: orders.customerExternalId,
         email: orders.email,
         processedAt: orders.processedAt,
@@ -250,7 +250,7 @@ export class CustomersService {
       .from(orders)
       .where(
         and(
-          inArray(orders.storeId, storeIds),
+          inArray(orders.channelId, storeIds),
           eq(orders.test, false),
           isNotNull(orders.customerExternalId),
         ),
@@ -260,8 +260,8 @@ export class CustomersService {
       const at = r.processedAt ?? r.shopifyCreatedAt ?? r.createdAt;
       const cust = r.customerExternalId as string;
       return {
-        customerKey: `${r.storeId}|${cust}`,
-        storeId: r.storeId,
+        customerKey: `${r.channelId}|${cust}`,
+        channelId: r.channelId,
         customerExternalId: cust,
         email: r.email,
         date: at.toISOString().slice(0, 10),
@@ -283,7 +283,7 @@ export class CustomersService {
       .from(dailyStoreMetrics)
       .where(
         and(
-          inArray(dailyStoreMetrics.storeId, storeIds),
+          inArray(dailyStoreMetrics.channelId, storeIds),
           between(dailyStoreMetrics.date, from, to),
         ),
       );
@@ -291,15 +291,15 @@ export class CustomersService {
   }
 
   private async cached<T>(
-    orgId: string,
+    storeId: string,
     endpoint: string,
     filter: AnalyticsFilter,
     fn: () => Promise<T>,
   ): Promise<T> {
-    const stores = filter.storeIds.length
+    const channels = filter.storeIds.length
       ? [...filter.storeIds].sort().join(",")
       : "all";
-    const key = `analytics:${orgId}:customers:${endpoint}:${filter.from}:${filter.to}:${stores}`;
+    const key = `analytics:${storeId}:customers:${endpoint}:${filter.from}:${filter.to}:${channels}`;
     const hit = await this.redis.get(key);
     if (hit) return JSON.parse(hit) as T;
     const val = await fn();

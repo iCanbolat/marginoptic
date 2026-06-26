@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
-import { stores } from "../../database/schema/stores";
+import { channels } from "../../database/schema/channels";
 import { customers, orders, products } from "../../database/schema/sales";
 
 type Json = Record<string, unknown>;
@@ -23,17 +23,17 @@ export class GdprService {
 
   private async storeIdForShop(shop: string): Promise<string | null> {
     const [row] = await this.db
-      .select({ id: stores.id })
-      .from(stores)
-      .where(and(eq(stores.channel, "shopify"), eq(stores.externalShopId, shop)))
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(eq(channels.channel, "shopify"), eq(channels.externalShopId, shop)))
       .limit(1);
     return row?.id ?? null;
   }
 
   /** customers/redact — belirli müşterinin PII'ını siler. */
   async redactCustomer(shop: string, payload: Json): Promise<void> {
-    const storeId = await this.storeIdForShop(shop);
-    if (!storeId) {
+    const channelId = await this.storeIdForShop(shop);
+    if (!channelId) {
       this.logger.warn(`GDPR customers/redact: mağaza bulunamadı (${shop})`);
       return;
     }
@@ -47,7 +47,7 @@ export class GdprService {
         .delete(customers)
         .where(
           and(
-            eq(customers.storeId, storeId),
+            eq(customers.channelId, channelId),
             or(
               externalId ? eq(customers.externalId, externalId) : undefined,
               email ? eq(customers.email, email) : undefined,
@@ -67,7 +67,7 @@ export class GdprService {
         .set(anonymize)
         .where(
           and(
-            eq(orders.storeId, storeId),
+            eq(orders.channelId, channelId),
             inArray(orders.externalId, ordersToRedact),
           ),
         );
@@ -77,7 +77,7 @@ export class GdprService {
         .set(anonymize)
         .where(
           and(
-            eq(orders.storeId, storeId),
+            eq(orders.channelId, channelId),
             eq(orders.customerExternalId, externalId),
           ),
         );
@@ -87,19 +87,19 @@ export class GdprService {
 
   /** shop/redact — mağazanın tüm ham satış/müşteri verisini siler. */
   async redactShop(shop: string): Promise<void> {
-    const storeId = await this.storeIdForShop(shop);
-    if (!storeId) {
+    const channelId = await this.storeIdForShop(shop);
+    if (!channelId) {
       this.logger.warn(`GDPR shop/redact: mağaza bulunamadı (${shop})`);
       return;
     }
     // Cascade: orders→(line_items, transactions, refunds), products→variants.
-    await this.db.delete(orders).where(eq(orders.storeId, storeId));
-    await this.db.delete(products).where(eq(products.storeId, storeId));
-    await this.db.delete(customers).where(eq(customers.storeId, storeId));
+    await this.db.delete(orders).where(eq(orders.channelId, channelId));
+    await this.db.delete(products).where(eq(products.channelId, channelId));
+    await this.db.delete(customers).where(eq(customers.channelId, channelId));
     await this.db
-      .update(stores)
+      .update(channels)
       .set({ status: "disconnected", updatedAt: new Date() })
-      .where(eq(stores.id, storeId));
+      .where(eq(channels.id, channelId));
     this.logger.log(`GDPR shop/redact tamamlandı — ham veri silindi (${shop})`);
   }
 

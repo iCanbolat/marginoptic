@@ -4,11 +4,10 @@ import { SkipThrottle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { pixelEventSchema, type StoreTrackingInfo } from "@churnify/shared";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
+  type ActiveStore,
+  CurrentStore,
+} from "../auth/decorators/current-store.decorator";
 import { Public } from "../auth/decorators/public.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
 import { ProductTrafficService } from "./product-traffic.service";
 
 /** Pixel `text/plain` (preflight'sız) gönderir → ham gövdeyi okuyup JSON çözeriz. */
@@ -58,26 +57,25 @@ export class TrackingController {
 
   /** Mağaza Web Pixel Account ID'si (pixel ayarına yapıştırılır). */
   @ApiBearerAuth()
-  @Get("stores/:storeId/tracking")
+  @Get("channels/:channelId/tracking")
   tracking(
-    @CurrentOrg() org: ActiveOrg,
-    @Param("storeId") storeId: string,
+    @CurrentStore() org: ActiveStore,
+    @Param("channelId") channelId: string,
   ): Promise<StoreTrackingInfo> {
-    return this.traffic.ensureTrackingInfo(org.id, storeId);
+    return this.traffic.ensureTrackingInfo(org.id, channelId);
   }
 
   /** Amazon/eBay traffic'i şimdi yenile (manuel tetik; sync-all da kapsar). */
   @ApiBearerAuth()
-  @Roles("owner", "admin")
   @HttpCode(200)
-  @Post("stores/:storeId/tracking/marketplace-sync")
+  @Post("channels/:channelId/tracking/marketplace-sync")
   async marketplaceSync(
-    @CurrentOrg() org: ActiveOrg,
-    @Param("storeId") storeId: string,
+    @CurrentStore() org: ActiveStore,
+    @Param("channelId") channelId: string,
   ): Promise<{ synced: boolean }> {
     const synced = await this.traffic.syncMarketplaceTrafficForOrg(
       org.id,
-      storeId,
+      channelId,
     );
     return { synced };
   }

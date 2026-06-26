@@ -22,10 +22,9 @@ import {
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
+  type ActiveStore,
+  CurrentStore,
+} from "../auth/decorators/current-store.decorator";
 import { CustomMetricsService } from "./custom-metrics.service";
 
 const EDIT_ROLES = ["owner", "admin", "analyst"] as const;
@@ -37,14 +36,14 @@ export class CustomMetricsController {
   constructor(private readonly metrics: CustomMetricsService) {}
 
   @Get()
-  list(@CurrentOrg() org: ActiveOrg): Promise<CustomMetricSummary[]> {
+  list(@CurrentStore() org: ActiveStore): Promise<CustomMetricSummary[]> {
     return this.metrics.list(org.id);
   }
 
   /** Org özel metriklerini verilen aralık/mağazalar için değerlendirir. */
   @Get("values")
   values(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(new ZodValidationPipe(analyticsFilterSchema))
     filter: AnalyticsFilter,
   ): Promise<CustomMetricValuesResponse> {
@@ -52,9 +51,8 @@ export class CustomMetricsController {
   }
 
   @Post()
-  @Roles(...EDIT_ROLES)
   create(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Body(new ZodValidationPipe(customMetricCreateSchema))
     dto: CustomMetricCreateInput,
   ): Promise<CustomMetricSummary> {
@@ -62,9 +60,8 @@ export class CustomMetricsController {
   }
 
   @Patch(":id")
-  @Roles(...EDIT_ROLES)
   update(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(customMetricUpdateSchema))
     dto: CustomMetricUpdateInput,
@@ -73,10 +70,9 @@ export class CustomMetricsController {
   }
 
   @Delete(":id")
-  @Roles(...EDIT_ROLES)
   @HttpCode(204)
   remove(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("id") id: string,
   ): Promise<void> {
     return this.metrics.remove(org.id, id);

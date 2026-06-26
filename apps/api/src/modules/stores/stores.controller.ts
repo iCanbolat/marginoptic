@@ -1,45 +1,62 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
   HttpCode,
   Param,
+  Patch,
+  Post,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import type { StoreSummary } from "@churnify/shared";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
+  storeNameSchema,
+  type StoreNameInput,
+  type StoreView,
+} from "@churnify/shared";
+import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
+import type { AuthContext } from "../auth/auth.types";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { StoresService } from "./stores.service";
 
+/**
+ * Mağaza (store) yönetimi — kullanıcının sahip olduğu mağazaların CRUD'u.
+ * Route tabanı tarihsel sebeple `/stores`; UI'da "mağaza" olarak sunulur.
+ */
 @ApiTags("stores")
 @ApiBearerAuth()
 @Controller("stores")
 export class StoresController {
-  constructor(private readonly stores: StoresService) {}
+  constructor(private readonly orgs: StoresService) {}
 
   @Get()
-  list(@CurrentOrg() org: ActiveOrg): Promise<StoreSummary[]> {
-    return this.stores.listForOrg(org.id);
+  list(@CurrentUser() user: AuthContext): Promise<StoreView[]> {
+    return this.orgs.listForUser(user.userId);
   }
 
-  @Get(":id")
-  get(
-    @CurrentOrg() org: ActiveOrg,
+  @Post()
+  create(
+    @CurrentUser() user: AuthContext,
+    @Body(new ZodValidationPipe(storeNameSchema)) dto: StoreNameInput,
+  ): Promise<StoreView> {
+    return this.orgs.createForOwner(user.userId, dto.name);
+  }
+
+  @Patch(":id")
+  rename(
+    @CurrentUser() user: AuthContext,
     @Param("id") id: string,
-  ): Promise<StoreSummary> {
-    return this.stores.getForOrg(org.id, id);
+    @Body(new ZodValidationPipe(storeNameSchema)) dto: StoreNameInput,
+  ): Promise<StoreView> {
+    return this.orgs.rename(user.userId, id, dto.name);
   }
 
   @Delete(":id")
-  @Roles("owner", "admin")
   @HttpCode(204)
-  disconnect(
-    @CurrentOrg() org: ActiveOrg,
+  remove(
+    @CurrentUser() user: AuthContext,
     @Param("id") id: string,
   ): Promise<void> {
-    return this.stores.disconnect(org.id, id);
+    return this.orgs.deleteForOwner(user.userId, id);
   }
 }

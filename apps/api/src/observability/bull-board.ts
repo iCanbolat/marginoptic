@@ -12,7 +12,6 @@ interface SimpleLogger {
 
 const QUEUE_NAMES = [
   "shopify-sync",
-  "etsy-sync",
   "webhooks",
   "token-refresh",
   "metrics-rollup",

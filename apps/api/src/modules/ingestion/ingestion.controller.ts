@@ -9,33 +9,33 @@ import {
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
+  type ActiveStore,
+  CurrentStore,
+} from "../auth/decorators/current-store.decorator";
 import { IngestionQueryService } from "./ingestion-query.service";
 
 @ApiTags("ingestion")
 @ApiBearerAuth()
-@Controller("stores/:storeId")
+@Controller("channels/:channelId")
 export class IngestionController {
   constructor(private readonly query: IngestionQueryService) {}
 
   /** Mağazanın backfill/sync durumunu döner (ilerleme + tazelik UI'ı için). */
   @Get("sync")
   syncStatus(
-    @CurrentOrg() org: ActiveOrg,
-    @Param("storeId") storeId: string,
+    @CurrentStore() org: ActiveStore,
+    @Param("channelId") channelId: string,
   ): Promise<StoreSyncStatus> {
-    return this.query.syncStatus(org.id, storeId);
+    return this.query.syncStatus(org.id, channelId);
   }
 
   /** Ham siparişler (cursor sayfalı, debug/iç görünürlük). */
   @Get("orders")
   orders(
-    @CurrentOrg() org: ActiveOrg,
-    @Param("storeId") storeId: string,
+    @CurrentStore() org: ActiveStore,
+    @Param("channelId") channelId: string,
     @Query(new ZodValidationPipe(ordersQuerySchema)) query: OrdersQuery,
   ): Promise<Paginated<OrderRow>> {
-    return this.query.listOrders(org.id, storeId, query);
+    return this.query.listOrders(org.id, channelId, query);
   }
 }

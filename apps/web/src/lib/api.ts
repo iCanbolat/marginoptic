@@ -35,23 +35,18 @@ import type {
   CustomExpenseUpdate,
   ExpenseAllocationRow,
   HealthResponse,
-  InvitationCreatedResponse,
-  InvitationView,
-  InviteMemberInput,
   LoginInput,
-  MemberView,
   MeResponse,
-  OrgSummary,
   PaymentFeeRuleInput,
   PaymentFeeRuleSummary,
   RegisterInput,
-  Role,
   SessionResponse,
   ShippingRuleInput,
   ShippingRuleSummary,
-  StoreSummary,
+  ChannelSummary,
   StoreSyncStatus,
-  SwitchOrgResponse,
+  StoreView,
+  SwitchStoreResponse,
   TaxConfigInput,
   TaxConfigSummary,
 } from "@churnify/shared";
@@ -129,41 +124,39 @@ export const authApi = {
   },
   refresh: refreshSession,
   me: () => apiFetch<MeResponse>("/auth/me"),
-  switchOrg: (organizationId: string) =>
-    apiFetch<SwitchOrgResponse>("/auth/switch-org", {
+  switchStore: (storeId: string) =>
+    apiFetch<SwitchStoreResponse>("/auth/switch-store", {
       method: "POST",
-      body: JSON.stringify({ organizationId }),
+      body: JSON.stringify({ storeId }),
     }),
 };
 
-export const orgApi = {
-  list: () => apiFetch<OrgSummary[]>("/organizations"),
+/**
+ * Mağaza (store = üst grup) yönetimi — kullanıcının sahip olduğu mağazalar.
+ * Route tabanı tarihsel sebeple `/stores`.
+ */
+export const storesApi = {
+  list: () => apiFetch<StoreView[]>("/stores"),
   create: (name: string) =>
-    apiFetch<OrgSummary>("/organizations", {
+    apiFetch<StoreView>("/stores", {
       method: "POST",
       body: JSON.stringify({ name }),
     }),
-  members: () => apiFetch<MemberView[]>("/organizations/members"),
-  invitations: () => apiFetch<InvitationView[]>("/organizations/invitations"),
-  invite: (input: InviteMemberInput) =>
-    apiFetch<InvitationCreatedResponse>("/organizations/invitations", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-  updateRole: (userId: string, role: Exclude<Role, "owner">) =>
-    apiFetch<{ ok: true }>(`/organizations/members/${userId}/role`, {
+  rename: (id: string, name: string) =>
+    apiFetch<StoreView>(`/stores/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ role }),
+      body: JSON.stringify({ name }),
     }),
-  removeMember: (userId: string) =>
-    apiFetch<void>(`/organizations/members/${userId}`, { method: "DELETE" }),
+  remove: (id: string) =>
+    apiFetch<void>(`/stores/${id}`, { method: "DELETE" }),
 };
 
 // NOT: integrations çağrıları artık feature içinde yaşıyor (axios):
 // `features/integrations/api/integration-api.ts`.
 
-export const storesApi = {
-  list: () => apiFetch<StoreSummary[]>("/stores"),
+/** Aktif mağazanın satış kanalları (per-kanal `/channels`). UI'da "kanal". */
+export const channelsApi = {
+  list: () => apiFetch<ChannelSummary[]>("/channels"),
 };
 
 export interface AdsPerformanceParams {
@@ -177,7 +170,7 @@ export const adsApi = {
     const qs = new URLSearchParams({ from: params.from, to: params.to });
     if (params.level) qs.set("level", params.level);
     return apiFetch<AdsPerformanceResponse>(
-      `/stores/${storeId}/ads/performance?${qs.toString()}`,
+      `/channels/${storeId}/ads/performance?${qs.toString()}`,
     );
   },
 };
@@ -188,7 +181,7 @@ export const adsApi = {
 
 export const ingestionApi = {
   syncStatus: (storeId: string) =>
-    apiFetch<StoreSyncStatus>(`/stores/${storeId}/sync`),
+    apiFetch<StoreSyncStatus>(`/channels/${storeId}/sync`),
 };
 
 // --- Faz 4: Maliyet modelleme ---
@@ -207,56 +200,56 @@ export interface CostResolveParams {
 export const costsApi = {
   // COGS
   listCogs: (storeId: string) =>
-    apiFetch<CogsRuleSummary[]>(`/stores/${storeId}/costs/cogs`),
+    apiFetch<CogsRuleSummary[]>(`/channels/${storeId}/costs/cogs`),
   createCogs: (storeId: string, input: CogsRuleInput) =>
-    apiFetch<CogsRuleSummary>(`/stores/${storeId}/costs/cogs`, {
+    apiFetch<CogsRuleSummary>(`/channels/${storeId}/costs/cogs`, {
       method: "POST",
       body: JSON.stringify(input),
     }),
   updateCogs: (storeId: string, id: string, input: CogsRuleUpdate) =>
-    apiFetch<CogsRuleSummary>(`/stores/${storeId}/costs/cogs/${id}`, {
+    apiFetch<CogsRuleSummary>(`/channels/${storeId}/costs/cogs/${id}`, {
       method: "PATCH",
       body: JSON.stringify(input),
     }),
   deleteCogs: (storeId: string, id: string) =>
-    apiFetch<void>(`/stores/${storeId}/costs/cogs/${id}`, { method: "DELETE" }),
+    apiFetch<void>(`/channels/${storeId}/costs/cogs/${id}`, { method: "DELETE" }),
   importCogs: (storeId: string, input: CogsCsvImportInput) =>
-    apiFetch<CogsCsvImportResult>(`/stores/${storeId}/costs/cogs/import`, {
+    apiFetch<CogsCsvImportResult>(`/channels/${storeId}/costs/cogs/import`, {
       method: "POST",
       body: JSON.stringify(input),
     }),
 
   // Kargo
   listShipping: (storeId: string) =>
-    apiFetch<ShippingRuleSummary[]>(`/stores/${storeId}/costs/shipping`),
+    apiFetch<ShippingRuleSummary[]>(`/channels/${storeId}/costs/shipping`),
   createShipping: (storeId: string, input: ShippingRuleInput) =>
-    apiFetch<ShippingRuleSummary>(`/stores/${storeId}/costs/shipping`, {
+    apiFetch<ShippingRuleSummary>(`/channels/${storeId}/costs/shipping`, {
       method: "POST",
       body: JSON.stringify(input),
     }),
   deleteShipping: (storeId: string, id: string) =>
-    apiFetch<void>(`/stores/${storeId}/costs/shipping/${id}`, {
+    apiFetch<void>(`/channels/${storeId}/costs/shipping/${id}`, {
       method: "DELETE",
     }),
 
   // Ödeme ücreti
   listPaymentFees: (storeId: string) =>
-    apiFetch<PaymentFeeRuleSummary[]>(`/stores/${storeId}/costs/payment-fees`),
+    apiFetch<PaymentFeeRuleSummary[]>(`/channels/${storeId}/costs/payment-fees`),
   createPaymentFee: (storeId: string, input: PaymentFeeRuleInput) =>
-    apiFetch<PaymentFeeRuleSummary>(`/stores/${storeId}/costs/payment-fees`, {
+    apiFetch<PaymentFeeRuleSummary>(`/channels/${storeId}/costs/payment-fees`, {
       method: "POST",
       body: JSON.stringify(input),
     }),
   deletePaymentFee: (storeId: string, id: string) =>
-    apiFetch<void>(`/stores/${storeId}/costs/payment-fees/${id}`, {
+    apiFetch<void>(`/channels/${storeId}/costs/payment-fees/${id}`, {
       method: "DELETE",
     }),
 
   // Vergi
   getTax: (storeId: string) =>
-    apiFetch<TaxConfigSummary>(`/stores/${storeId}/costs/tax`),
+    apiFetch<TaxConfigSummary>(`/channels/${storeId}/costs/tax`),
   putTax: (storeId: string, input: TaxConfigInput) =>
-    apiFetch<TaxConfigSummary>(`/stores/${storeId}/costs/tax`, {
+    apiFetch<TaxConfigSummary>(`/channels/${storeId}/costs/tax`, {
       method: "PUT",
       body: JSON.stringify(input),
     }),
@@ -268,7 +261,7 @@ export const costsApi = {
       if (v != null && v !== "") qs.set(k, String(v));
     }
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return apiFetch<CostResolution>(`/stores/${storeId}/costs/resolve${suffix}`);
+    return apiFetch<CostResolution>(`/channels/${storeId}/costs/resolve${suffix}`);
   },
 };
 

@@ -8,7 +8,7 @@ export interface CreemCheckoutInput {
   productId: string;
   successUrl: string;
   email: string;
-  /** İzleme/idempotency kimliği — webhook'ta geri döner (biz orgId yazarız). */
+  /** İzleme/idempotency kimliği — webhook'ta geri döner (biz storeId yazarız). */
   requestId: string;
   metadata: Record<string, string>;
 }

@@ -27,7 +27,7 @@ const ENDPOINTS = {
 /**
  * Faz 10 — eBay connector (OAuth2 authorization code, Sell API).
  *
- * Etsy gibi Shopify'ın `OAuthConnector` arayüzünü uygulamaz (eBay'in webhook modeli
+ * Shopify'ın `OAuthConnector` arayüzünü uygulamaz (eBay'in webhook modeli
  * Shopify HMAC'ine uymaz; tazelik **zamanlanmış polling** ile sağlanır), bu yüzden ayrı
  * bir sınıf; `IntegrationsService` doğrudan kullanır. `EBAY_CLIENT_ID` yoksa `isConfigured`
  * false → canlı OAuth engellenir; dev-connect (sentetik) yine çalışır.

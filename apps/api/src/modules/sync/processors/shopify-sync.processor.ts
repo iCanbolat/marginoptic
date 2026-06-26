@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import type { Job } from "bullmq";
 import { CryptoService } from "../../../common/crypto/crypto.service";
 import { DRIZZLE, type DrizzleDB } from "../../../database/database.module";
-import { integrationConnections } from "../../../database/schema/stores";
+import { integrationConnections } from "../../../database/schema/channels";
 import { ShopifyBackfillService } from "../../ingestion/shopify-backfill.service";
 import { QUEUE_SHOPIFY_SYNC, type ShopifySyncJob } from "../sync.constants";
 import { SyncService } from "../sync.service";
@@ -23,7 +23,7 @@ export class ShopifySyncProcessor extends WorkerHost {
   }
 
   async process(job: Job<ShopifySyncJob>): Promise<void> {
-    const { connectionId, storeId, resource, shop } = job.data;
+    const { connectionId, channelId, resource, shop } = job.data;
 
     const [conn] = await this.db
       .select({
@@ -50,7 +50,7 @@ export class ShopifySyncProcessor extends WorkerHost {
     try {
       const accessToken = this.crypto.decrypt(conn.accessTokenEnc);
       const { processed, total } = await this.backfill.run(
-        { storeId, shop, accessToken, resource },
+        { channelId, shop, accessToken, resource },
         async (p, t) => {
           await this.sync.setSyncState(connectionId, resource, "running", {
             stats: { processed: p, total: t },

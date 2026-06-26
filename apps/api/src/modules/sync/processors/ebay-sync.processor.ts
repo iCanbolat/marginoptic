@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import type { Job } from "bullmq";
 import { CryptoService } from "../../../common/crypto/crypto.service";
 import { DRIZZLE, type DrizzleDB } from "../../../database/database.module";
-import { integrationConnections } from "../../../database/schema/stores";
+import { integrationConnections } from "../../../database/schema/channels";
 import { EbayBackfillService } from "../../ingestion/ebay-backfill.service";
 import { QUEUE_EBAY_SYNC, type EbaySyncJob } from "../sync.constants";
 import { SyncService } from "../sync.service";
@@ -23,7 +23,7 @@ export class EbaySyncProcessor extends WorkerHost {
   }
 
   async process(job: Job<EbaySyncJob>): Promise<void> {
-    const { connectionId, storeId, resource, shopId, since } = job.data;
+    const { connectionId, channelId, resource, shopId, since } = job.data;
 
     const [conn] = await this.db
       .select({
@@ -50,7 +50,7 @@ export class EbaySyncProcessor extends WorkerHost {
     try {
       const accessToken = this.crypto.decrypt(conn.accessTokenEnc);
       const { processed, total } = await this.backfill.run(
-        { storeId, shopId, accessToken, resource, since },
+        { channelId, shopId, accessToken, resource, since },
         async (p, t) => {
           await this.sync.setSyncState(connectionId, resource, "running", {
             stats: { processed: p, total: t },

@@ -22,10 +22,9 @@ import {
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
+  type ActiveStore,
+  CurrentStore,
+} from "../auth/decorators/current-store.decorator";
 import { ExpensesService } from "./expenses.service";
 
 const EDIT_ROLES = ["owner", "admin", "analyst"] as const;
@@ -38,16 +37,15 @@ export class ExpensesController {
 
   @Get()
   list(
-    @CurrentOrg() org: ActiveOrg,
-    @Query("storeId") storeId?: string,
+    @CurrentStore() org: ActiveStore,
+    @Query("channelId") channelId?: string,
   ): Promise<CustomExpenseSummary[]> {
-    return this.expenses.list(org.id, storeId);
+    return this.expenses.list(org.id, channelId);
   }
 
   @Post()
-  @Roles(...EDIT_ROLES)
   create(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Body(new ZodValidationPipe(customExpenseInputSchema))
     dto: CustomExpenseInput,
   ): Promise<CustomExpenseSummary> {
@@ -55,9 +53,8 @@ export class ExpensesController {
   }
 
   @Patch(":id")
-  @Roles(...EDIT_ROLES)
   update(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(customExpenseUpdateSchema))
     dto: CustomExpenseUpdate,
@@ -66,10 +63,9 @@ export class ExpensesController {
   }
 
   @Delete(":id")
-  @Roles(...EDIT_ROLES)
   @HttpCode(204)
   remove(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("id") id: string,
   ): Promise<void> {
     return this.expenses.remove(org.id, id);
@@ -78,7 +74,7 @@ export class ExpensesController {
   /** Materialize edilmiş gün+mağaza dağılımını döner (job doğrulaması için). */
   @Get(":id/allocations")
   allocations(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("id") id: string,
     @Query(new ZodValidationPipe(expenseMaterializeSchema))
     range: ExpenseMaterializeInput,
@@ -88,10 +84,9 @@ export class ExpensesController {
 
   /** Gideri belirli aralıkta yeniden materialize etmeyi kuyruğa alır. */
   @Post(":id/materialize")
-  @Roles(...EDIT_ROLES)
   @HttpCode(202)
   async materialize(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(expenseMaterializeSchema))
     range: ExpenseMaterializeInput,

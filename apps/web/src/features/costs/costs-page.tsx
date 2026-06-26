@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useAuthStore } from "@/lib/auth/store";
 import { useStoreSelection } from "@/lib/stores/selection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStores } from "./hooks/use-stores";
@@ -15,8 +14,7 @@ import { TaxConfigCard } from "./components/tax-config-card";
 import { ExpensesPanel } from "./components/expenses-panel";
 
 export function CostsPage() {
-  const role = useAuthStore((s) => s.activeOrg?.role);
-  const canEdit = role === "owner" || role === "admin" || role === "analyst";
+  const canEdit = true;
 
   const activeStoreId = useStoreSelection((s) => s.activeStoreId);
   const { data: stores = [], isLoading } = useStores();

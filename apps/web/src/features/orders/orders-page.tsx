@@ -19,7 +19,6 @@ import { CustomerAnalyticsSection } from "./components/customer-analytics-sectio
 import { useStores } from "./hooks/use-stores";
 import { useOrders } from "./hooks/use-orders";
 import { ALL_STATUSES } from "./types/order-types";
-import { USE_MOCK_ORDERS } from "./mocks/orders-mock";
 
 const todayIso = (): string => new Date().toISOString().slice(0, 10);
 const startOfYearIso = (): string => `${todayIso().slice(0, 4)}-01-01`;
@@ -76,8 +75,7 @@ export function OrdersPage() {
 
       <CustomerAnalyticsSection filter={analyticsFilter} />
 
-      {/* Mock modda gerçek sync ucu olmadığından eşitleme kartını gizle. */}
-      {storeId && !USE_MOCK_ORDERS ? <SyncStatusCard storeId={storeId} /> : null}
+      {storeId ? <SyncStatusCard storeId={storeId} /> : null}
 
       <Card>
         <CardHeader>

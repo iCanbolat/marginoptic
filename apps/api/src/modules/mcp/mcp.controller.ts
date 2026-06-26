@@ -65,7 +65,7 @@ export class McpController {
     }
     await handleMcpRequest({
       provider: this.provider,
-      context: { orgId: verified.organizationId },
+      context: { storeId: verified.storeId },
       scopes: verified.scopes,
       req,
       res,

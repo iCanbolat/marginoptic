@@ -12,7 +12,7 @@ import {
 export type BackfillProgress = (processed: number, total: number) => Promise<void>;
 
 interface AmazonBackfillArgs {
-  storeId: string;
+  channelId: string;
   /** Amazon marketplace/satıcı kimliği (canlı fetch için); dev'de satıcı adı (sentetik seed). */
   shopId: string;
   accessToken: string;
@@ -26,7 +26,7 @@ const PROGRESS_EVERY = 25;
 /**
  * Faz 10 — Amazon tarihsel/artımlı veri backfill'i. Dev token (`dev_`) → sentetik API-şekilli
  * veri; aksi halde Amazon SP-API. Her iki yol da aynı normalizer + IngestionService idempotent
- * upsert'ini kullanır (eBay/Etsy backfill ile aynı desen).
+ * upsert'ini kullanır (eBay backfill ile aynı desen).
  */
 @Injectable()
 export class AmazonBackfillService {
@@ -67,14 +67,14 @@ export class AmazonBackfillService {
     switch (args.resource) {
       case "orders":
         for (const n of nodes) {
-          await this.ingestion.upsertOrder(args.storeId, normalizeAmazonOrder(n));
+          await this.ingestion.upsertOrder(args.channelId, normalizeAmazonOrder(n));
           await tick();
         }
         break;
       case "products":
         for (const n of nodes) {
           await this.ingestion.upsertProduct(
-            args.storeId,
+            args.channelId,
             normalizeAmazonListing(n),
           );
           await tick();
@@ -82,7 +82,7 @@ export class AmazonBackfillService {
         break;
       case "customers":
         for (const n of nodes) {
-          await this.ingestion.upsertCustomer(args.storeId, normalizeAmazonBuyer(n));
+          await this.ingestion.upsertCustomer(args.channelId, normalizeAmazonBuyer(n));
           await tick();
         }
         break;

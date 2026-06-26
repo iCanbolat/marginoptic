@@ -37,14 +37,14 @@ export const adProviderSchema = z.enum(AD_PROVIDERS);
 
 /** Reklam hesabı bağlama (dev-connect): mağaza + hesap kimliği. */
 export const adConnectSchema = z.object({
-  storeId: z.string().uuid(),
+  channelId: z.string().uuid(),
   externalAccountId: z.string().trim().min(1).max(255),
 });
 export type AdConnectInput = z.infer<typeof adConnectSchema>;
 
 /** Reklam OAuth başlatma: harcamanın atfedileceği mağaza. */
 export const adInstallSchema = z.object({
-  storeId: z.string().uuid(),
+  channelId: z.string().uuid(),
 });
 export type AdInstallInput = z.infer<typeof adInstallSchema>;
 
@@ -105,7 +105,7 @@ export interface AdsSummary {
 }
 
 export interface AdsPerformanceResponse {
-  storeId: string;
+  channelId: string;
   from: string;
   to: string;
   level: AdLevel;

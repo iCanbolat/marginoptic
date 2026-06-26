@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Store01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
-import { storesApi } from "@/lib/api";
+import { channelsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ export function StoreFilter({
 }) {
   const { data: stores = [] } = useQuery({
     queryKey: ["stores"],
-    queryFn: storesApi.list,
+    queryFn: channelsApi.list,
   });
 
   const toggle = (id: string) => {

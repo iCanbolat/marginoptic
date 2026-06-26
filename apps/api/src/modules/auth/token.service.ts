@@ -12,7 +12,7 @@ const ACCESS_TTL = "15m";
 
 export interface RotationResult {
   userId: string;
-  activeOrgId: string | null;
+  activeStoreId: string | null;
   newRaw: string;
 }
 
@@ -37,7 +37,7 @@ export class TokenService {
 
   async issueRefreshToken(
     userId: string,
-    activeOrgId: string | null,
+    activeStoreId: string | null,
     familyId?: string,
   ): Promise<string> {
     const raw = randomBytes(32).toString("base64url");
@@ -45,7 +45,7 @@ export class TokenService {
       userId,
       tokenHash: this.hash(raw),
       familyId: familyId ?? randomUUID(),
-      activeOrgId,
+      activeStoreId,
       expiresAt: new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000),
     });
     return raw;
@@ -75,10 +75,10 @@ export class TokenService {
 
     const newRaw = await this.issueRefreshToken(
       row.userId,
-      row.activeOrgId,
+      row.activeStoreId,
       row.familyId,
     );
-    return { userId: row.userId, activeOrgId: row.activeOrgId, newRaw };
+    return { userId: row.userId, activeStoreId: row.activeStoreId, newRaw };
   }
 
   async revokeByRaw(raw: string): Promise<void> {
@@ -103,10 +103,10 @@ export class TokenService {
   }
 
   /** Org switch — geçerli refresh kaydının aktif org'unu günceller. */
-  async setActiveOrg(raw: string, orgId: string): Promise<void> {
+  async setActiveStore(raw: string, storeId: string): Promise<void> {
     await this.db
       .update(refreshTokens)
-      .set({ activeOrgId: orgId })
+      .set({ activeStoreId: storeId })
       .where(eq(refreshTokens.tokenHash, this.hash(raw)));
   }
 }

@@ -20,7 +20,7 @@ import { dashboards, dashboardWidgets } from "../../database/schema/dashboards";
 export class DashboardsService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
-  async list(orgId: string): Promise<DashboardSummary[]> {
+  async list(storeId: string): Promise<DashboardSummary[]> {
     const rows = await this.db
       .select({
         id: dashboards.id,
@@ -30,7 +30,7 @@ export class DashboardsService {
         updatedAt: dashboards.updatedAt,
       })
       .from(dashboards)
-      .where(eq(dashboards.organizationId, orgId))
+      .where(eq(dashboards.storeId, storeId))
       .orderBy(asc(dashboards.createdAt));
     if (rows.length === 0) return [];
 
@@ -59,8 +59,8 @@ export class DashboardsService {
     }));
   }
 
-  async get(orgId: string, id: string): Promise<DashboardDetail> {
-    const dash = await this.assertExists(orgId, id);
+  async get(storeId: string, id: string): Promise<DashboardDetail> {
+    const dash = await this.assertExists(storeId, id);
     const widgets = await this.loadWidgets(id);
     return {
       id: dash.id,
@@ -74,7 +74,7 @@ export class DashboardsService {
   }
 
   async create(
-    orgId: string,
+    storeId: string,
     userId: string,
     input: DashboardCreateInput,
   ): Promise<DashboardDetail> {
@@ -82,15 +82,15 @@ export class DashboardsService {
       const [{ count }] = await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(dashboards)
-        .where(eq(dashboards.organizationId, orgId));
+        .where(eq(dashboards.storeId, storeId));
       // İlk pano her zaman varsayılan; aksi halde istek belirler.
       const makeDefault = input.isDefault === true || count === 0;
-      if (makeDefault) await this.clearDefault(tx, orgId);
+      if (makeDefault) await this.clearDefault(tx, storeId);
 
       const [row] = await tx
         .insert(dashboards)
         .values({
-          organizationId: orgId,
+          storeId: storeId,
           createdBy: userId,
           name: input.name,
           isDefault: makeDefault,
@@ -109,13 +109,13 @@ export class DashboardsService {
   }
 
   async update(
-    orgId: string,
+    storeId: string,
     id: string,
     input: DashboardUpdateInput,
   ): Promise<DashboardDetail> {
-    await this.assertExists(orgId, id);
+    await this.assertExists(storeId, id);
     await this.db.transaction(async (tx) => {
-      if (input.isDefault === true) await this.clearDefault(tx, orgId);
+      if (input.isDefault === true) await this.clearDefault(tx, storeId);
       await tx
         .update(dashboards)
         .set({
@@ -126,23 +126,23 @@ export class DashboardsService {
           updatedAt: new Date(),
         })
         .where(
-          and(eq(dashboards.id, id), eq(dashboards.organizationId, orgId)),
+          and(eq(dashboards.id, id), eq(dashboards.storeId, storeId)),
         );
     });
-    return this.get(orgId, id);
+    return this.get(storeId, id);
   }
 
-  async remove(orgId: string, id: string): Promise<void> {
-    const dash = await this.assertExists(orgId, id);
+  async remove(storeId: string, id: string): Promise<void> {
+    const dash = await this.assertExists(storeId, id);
     await this.db
       .delete(dashboards)
-      .where(and(eq(dashboards.id, id), eq(dashboards.organizationId, orgId)));
+      .where(and(eq(dashboards.id, id), eq(dashboards.storeId, storeId)));
     // Sildiğimiz varsayılansa, kalan ilk panoyu varsayılan yap.
     if (dash.isDefault) {
       const [next] = await this.db
         .select({ id: dashboards.id })
         .from(dashboards)
-        .where(eq(dashboards.organizationId, orgId))
+        .where(eq(dashboards.storeId, storeId))
         .orderBy(asc(dashboards.createdAt))
         .limit(1);
       if (next) {
@@ -156,11 +156,11 @@ export class DashboardsService {
 
   /** Pano widget'larını + layout'unu toplu kaydeder (tam değiştir). */
   async saveWidgets(
-    orgId: string,
+    storeId: string,
     id: string,
     input: DashboardWidgetsInput,
   ): Promise<DashboardDetail> {
-    await this.assertExists(orgId, id);
+    await this.assertExists(storeId, id);
     await this.db.transaction(async (tx) => {
       await tx
         .delete(dashboardWidgets)
@@ -185,7 +185,7 @@ export class DashboardsService {
         .set({ updatedAt: new Date() })
         .where(eq(dashboards.id, id));
     });
-    return this.get(orgId, id);
+    return this.get(storeId, id);
   }
 
   // ---- iç ----
@@ -204,11 +204,11 @@ export class DashboardsService {
     }));
   }
 
-  private async assertExists(orgId: string, id: string) {
+  private async assertExists(storeId: string, id: string) {
     const [row] = await this.db
       .select()
       .from(dashboards)
-      .where(and(eq(dashboards.id, id), eq(dashboards.organizationId, orgId)))
+      .where(and(eq(dashboards.id, id), eq(dashboards.storeId, storeId)))
       .limit(1);
     if (!row) throw new NotFoundException("Pano bulunamadı");
     return row;
@@ -217,14 +217,14 @@ export class DashboardsService {
   /** Org'un mevcut varsayılanını temizler (partial-unique ihlalini önler). */
   private async clearDefault(
     tx: Parameters<Parameters<DrizzleDB["transaction"]>[0]>[0],
-    orgId: string,
+    storeId: string,
   ): Promise<void> {
     await tx
       .update(dashboards)
       .set({ isDefault: false })
       .where(
         and(
-          eq(dashboards.organizationId, orgId),
+          eq(dashboards.storeId, storeId),
           eq(dashboards.isDefault, true),
         ),
       );

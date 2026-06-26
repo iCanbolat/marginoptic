@@ -74,11 +74,11 @@ export class ContributionService {
    * `range` verilmezse tüm siparişler (tam rollup); verilirse processedAt o aralıkta.
    */
   async computeStoreContributions(
-    storeId: string,
+    channelId: string,
     storeCurrency: string,
     range?: DateRange,
   ): Promise<OrderContribution[]> {
-    const conds = [eq(orders.storeId, storeId), eq(orders.test, false)];
+    const conds = [eq(orders.channelId, channelId), eq(orders.test, false)];
     if (range) {
       conds.push(
         between(
@@ -115,7 +115,7 @@ export class ContributionService {
     const txnsByOrder = groupBy(txnRows, (r) => r.orderId);
     const refundsByOrder = groupBy(refundRows, (r) => r.orderId);
 
-    const tax = await this.resolver.resolveTax(storeId);
+    const tax = await this.resolver.resolveTax(channelId);
 
     const out: OrderContribution[] = [];
     for (const o of orderRows) {
@@ -136,7 +136,7 @@ export class ContributionService {
         const revenue = await fxConvert(grossLine);
         const discount = await fxConvert(num(li.discountAmount));
         const cogsRes = await this.resolver.resolveCogs({
-          storeId,
+          channelId,
           sku: li.sku,
           variantExternalId: li.variantExternalId,
           productExternalId: li.productExternalId,
@@ -167,7 +167,7 @@ export class ContributionService {
       );
 
       const shippingRes = await this.resolver.resolveShipping({
-        storeId,
+        channelId,
         country: null,
         quantity: units || 1,
         weightGrams: null,
@@ -176,7 +176,7 @@ export class ContributionService {
       const shippingCost = shippingRes ? num(shippingRes.cost) : 0;
 
       const paymentFees = await this.resolvePaymentFees(
-        storeId,
+        channelId,
         txnsByOrder.get(o.id) ?? [],
         o.totalPrice,
         orderCurrency,
@@ -217,7 +217,7 @@ export class ContributionService {
 
   /** Gerçek transaction fee'leri varsa onları, yoksa payment_fee_rules ile çözer. */
   private async resolvePaymentFees(
-    storeId: string,
+    channelId: string,
     txns: (typeof orderTransactions.$inferSelect)[],
     totalPrice: string | null,
     orderCurrency: string,
@@ -244,7 +244,7 @@ export class ContributionService {
       date,
     );
     const res = await this.resolver.resolvePaymentFee({
-      storeId,
+      channelId,
       gateway: txns[0]?.gateway ?? null,
       amount: amountStore.toFixed(4),
       at,

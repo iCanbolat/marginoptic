@@ -21,9 +21,9 @@ import {
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
+  type ActiveStore,
+  CurrentStore,
+} from "../auth/decorators/current-store.decorator";
 import { AnalyticsService } from "./analytics.service";
 import { CustomersService } from "./customers.service";
 import { ProductAnalyticsService } from "./product-analytics.service";
@@ -59,7 +59,7 @@ export class AnalyticsController {
 
   @Get("profit-summary")
   profitSummary(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
   ): Promise<ProfitSummaryResponse> {
     return this.analytics.profitSummary(org.id, filter);
@@ -67,7 +67,7 @@ export class AnalyticsController {
 
   @Get("pnl")
   pnl(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
   ): Promise<PnlResponse> {
     return this.analytics.pnl(org.id, filter);
@@ -75,7 +75,7 @@ export class AnalyticsController {
 
   @Get("timeseries")
   timeseries(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
   ): Promise<TimeseriesResponse> {
     return this.analytics.timeseries(org.id, filter);
@@ -83,7 +83,7 @@ export class AnalyticsController {
 
   @Get("store-comparison")
   storeComparison(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
   ): Promise<StoreComparisonResponse> {
     return this.analytics.storeComparison(org.id, filter);
@@ -91,7 +91,7 @@ export class AnalyticsController {
 
   @Get("products")
   products(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
     @Query("limit") limit?: string,
   ): Promise<ProductRankingResponse> {
@@ -100,17 +100,17 @@ export class AnalyticsController {
 
   @Get("ads/performance")
   adsPerformance(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
     @Query("level") level?: string,
   ): Promise<AdsPerformanceResponse> {
     return this.analytics.adsPerformance(org.id, filter, parseLevel(level));
   }
 
-  /** Ürün Analizi overview: 3 platform (Etsy hariç) → 4 kart. */
+  /** Ürün Analizi overview: 3 platform → 4 kart. */
   @Get("product-overview")
   productOverview(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
   ): Promise<ProductOverviewResponse> {
     return this.productAnalytics.overview(org.id, filter);
@@ -119,7 +119,7 @@ export class AnalyticsController {
   /** Ürün tablosu: ürün-bazlı ROAS / reklam harcaması / dönüşüm (sayfalı). */
   @Get("product-table")
   productTable(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(productTablePipe) query: ProductTableQuery,
   ): Promise<ProductTableResponse> {
     return this.productAnalytics.table(org.id, query);
@@ -127,7 +127,7 @@ export class AnalyticsController {
 
   @Get("customers/ltv")
   ltv(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
   ): Promise<CustomerLtvResponse> {
     return this.customers.ltv(org.id, filter);
@@ -135,7 +135,7 @@ export class AnalyticsController {
 
   @Get("customers/cac")
   cac(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
   ): Promise<CustomerCacResponse> {
     return this.customers.cac(org.id, filter);
@@ -143,7 +143,7 @@ export class AnalyticsController {
 
   @Get("customers/cohorts")
   cohorts(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(filterPipe) filter: AnalyticsFilter,
   ): Promise<CustomerCohortsResponse> {
     return this.customers.cohorts(org.id, filter);

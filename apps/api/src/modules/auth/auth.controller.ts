@@ -14,11 +14,11 @@ import type { Request, Response } from "express";
 import {
   loginSchema,
   registerSchema,
-  switchOrgSchema,
+  switchStoreSchema,
   type LoginInput,
   type RegisterInput,
   type SessionResponse,
-  type SwitchOrgInput,
+  type SwitchStoreInput,
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { AuthService } from "./auth.service";
@@ -94,14 +94,14 @@ export class AuthController {
 
   @ApiBearerAuth()
   @HttpCode(200)
-  @Post("switch-org")
-  switchOrg(
+  @Post("switch-store")
+  switchStore(
     @CurrentUser() user: AuthContext,
-    @Body(new ZodValidationPipe(switchOrgSchema)) dto: SwitchOrgInput,
+    @Body(new ZodValidationPipe(switchStoreSchema)) dto: SwitchStoreInput,
     @Req() req: Request,
   ) {
     const raw = (req.cookies?.[REFRESH_COOKIE] as string | undefined) ?? null;
-    return this.auth.switchOrg(user.userId, dto.organizationId, raw);
+    return this.auth.switchStore(user.userId, dto.storeId, raw);
   }
 
   private setRefreshCookie(res: Response, token: string): void {

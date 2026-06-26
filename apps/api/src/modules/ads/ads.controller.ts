@@ -7,28 +7,28 @@ import {
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
+  type ActiveStore,
+  CurrentStore,
+} from "../auth/decorators/current-store.decorator";
 import { AdsQueryService } from "./ads-query.service";
 
 @ApiTags("ads")
 @ApiBearerAuth()
-@Controller("stores/:storeId/ads")
+@Controller("channels/:channelId/ads")
 export class AdsController {
   constructor(private readonly ads: AdsQueryService) {}
 
   /** Reklam performansı: kırılım (campaign/adset/ad) + blended ROAS/POAS + gün serisi. */
   @Get("performance")
   performance(
-    @CurrentOrg() org: ActiveOrg,
-    @Param("storeId") storeId: string,
+    @CurrentStore() org: ActiveStore,
+    @Param("channelId") channelId: string,
     @Query(new ZodValidationPipe(adsPerformanceQuerySchema))
     query: AdsPerformanceQuery,
   ): Promise<AdsPerformanceResponse> {
     return this.ads.getPerformance(
       org.id,
-      storeId,
+      channelId,
       query.from,
       query.to,
       query.level,

@@ -13,7 +13,7 @@ import { generateApiKey, hashApiKey } from "./api-key.crypto";
 /** MCP auth doğrulaması sonucu (org + kapsamlar). */
 export interface VerifiedApiKey {
   id: string;
-  organizationId: string;
+  storeId: string;
   scopes: McpScope[];
 }
 
@@ -40,17 +40,17 @@ const toSummary = (r: Row): ApiKeySummary => ({
 export class ApiKeysService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
-  async list(orgId: string): Promise<ApiKeySummary[]> {
+  async list(storeId: string): Promise<ApiKeySummary[]> {
     const rows = await this.db
       .select()
       .from(apiKeys)
-      .where(eq(apiKeys.organizationId, orgId))
+      .where(eq(apiKeys.storeId, storeId))
       .orderBy(desc(apiKeys.createdAt));
     return rows.map(toSummary);
   }
 
   async create(
-    orgId: string,
+    storeId: string,
     userId: string,
     input: ApiKeyCreateInput,
   ): Promise<ApiKeyCreatedResponse> {
@@ -58,7 +58,7 @@ export class ApiKeysService {
     const [row] = await this.db
       .insert(apiKeys)
       .values({
-        organizationId: orgId,
+        storeId: storeId,
         name: input.name,
         keyHash,
         keyPrefix,
@@ -70,18 +70,18 @@ export class ApiKeysService {
   }
 
   /** İptal (soft-delete). İdempotent: zaten iptalliyse no-op. */
-  async revoke(orgId: string, id: string): Promise<void> {
+  async revoke(storeId: string, id: string): Promise<void> {
     const [row] = await this.db
       .select({ revokedAt: apiKeys.revokedAt })
       .from(apiKeys)
-      .where(and(eq(apiKeys.id, id), eq(apiKeys.organizationId, orgId)))
+      .where(and(eq(apiKeys.id, id), eq(apiKeys.storeId, storeId)))
       .limit(1);
     if (!row) throw new NotFoundException("API key bulunamadı");
     if (row.revokedAt) return;
     await this.db
       .update(apiKeys)
       .set({ revokedAt: new Date() })
-      .where(and(eq(apiKeys.id, id), eq(apiKeys.organizationId, orgId)));
+      .where(and(eq(apiKeys.id, id), eq(apiKeys.storeId, storeId)));
   }
 
   /**
@@ -105,6 +105,6 @@ export class ApiKeysService {
         .where(eq(apiKeys.id, row.id));
     }
 
-    return { id: row.id, organizationId: row.organizationId, scopes: row.scopes };
+    return { id: row.id, storeId: row.storeId, scopes: row.scopes };
   }
 }

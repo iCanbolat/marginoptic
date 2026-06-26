@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
-import { costsApi, dashboardsApi, storesApi } from "@/lib/api";
+import { costsApi, dashboardsApi, channelsApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ export function OnboardingChecklist() {
     () => localStorage.getItem(DISMISS_KEY) === "1",
   );
 
-  const storesQ = useQuery({ queryKey: ["stores"], queryFn: storesApi.list });
+  const storesQ = useQuery({ queryKey: ["stores"], queryFn: channelsApi.list });
   const dashboardsQ = useQuery({
     queryKey: ["dashboards"],
     queryFn: dashboardsApi.list,
@@ -50,8 +50,8 @@ export function OnboardingChecklist() {
   const steps: Step[] = [
     {
       id: "store",
-      title: "İlk mağazanı bağla",
-      description: "Shopify veya Etsy mağazanı bağlayarak siparişleri içe aktar.",
+      title: "İlk kanalını bağla",
+      description: "Shopify, Amazon veya eBay hesabını bağlayarak siparişleri içe aktar.",
       done: stores.length > 0,
       to: "/integrations",
       cta: "Mağaza bağla",

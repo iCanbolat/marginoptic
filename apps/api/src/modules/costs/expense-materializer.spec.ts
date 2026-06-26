@@ -93,9 +93,9 @@ describe("buildAllocations", () => {
       ["s1"],
     );
     expect(rows).toEqual([
-      { storeId: "s1", date: "2026-06-01", amount: "30.0000" },
-      { storeId: "s1", date: "2026-06-02", amount: "30.0000" },
-      { storeId: "s1", date: "2026-06-03", amount: "30.0000" },
+      { channelId: "s1", date: "2026-06-01", amount: "30.0000" },
+      { channelId: "s1", date: "2026-06-02", amount: "30.0000" },
+      { channelId: "s1", date: "2026-06-03", amount: "30.0000" },
     ]);
   });
 
@@ -125,7 +125,7 @@ describe("buildAllocations", () => {
       ["s1"],
     );
     expect(rows).toEqual([
-      { storeId: "s1", date: "2026-06-02", amount: "500.0000" },
+      { channelId: "s1", date: "2026-06-02", amount: "500.0000" },
     ]);
   });
 

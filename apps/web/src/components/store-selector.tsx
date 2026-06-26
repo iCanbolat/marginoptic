@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
-import { storesApi } from "@/lib/api";
+import { channelsApi } from "@/lib/api";
 import { useStoreSelection } from "@/lib/stores/selection";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ const ALL = "__all__";
 export function StoreSelector() {
   const { data: stores = [] } = useQuery({
     queryKey: ["stores"],
-    queryFn: storesApi.list,
+    queryFn: channelsApi.list,
   });
   const activeStoreId = useStoreSelection((s) => s.activeStoreId);
   const setActiveStoreId = useStoreSelection((s) => s.setActiveStoreId);

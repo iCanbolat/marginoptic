@@ -6,7 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   ACTIVE_STATUSES,
   PLANS,
@@ -18,12 +18,12 @@ import {
 } from "@churnify/shared";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
 import { billingEvents, subscriptions } from "../../database/schema/billing";
-import { stores } from "../../database/schema/stores";
+import { stores } from "../../database/schema/auth";
 import { CreemService } from "./creem.service";
 
 type SubRow = typeof subscriptions.$inferSelect;
 
-/** Org entitlement — plan gating kararları için. */
+/** Hesap (kullanıcı) entitlement'ı — plan gating kararları için. */
 export interface Entitlement {
   plan: EffectivePlan;
   status: SubscriptionStatus;
@@ -53,28 +53,27 @@ export class BillingService {
     private readonly config: ConfigService,
   ) {}
 
-  private async getRow(orgId: string): Promise<SubRow | null> {
+  private async getRow(userId: string): Promise<SubRow | null> {
     const [row] = await this.db
       .select()
       .from(subscriptions)
-      .where(eq(subscriptions.organizationId, orgId))
+      .where(eq(subscriptions.userId, userId))
       .limit(1);
     return row ?? null;
   }
 
-  private async countActiveStores(orgId: string): Promise<number> {
+  /** Kullanıcının sahip olduğu mağaza (store) sayısı. */
+  private async countStores(userId: string): Promise<number> {
     const [row] = await this.db
       .select({ n: sql<number>`count(*)::int` })
       .from(stores)
-      .where(
-        and(eq(stores.organizationId, orgId), ne(stores.status, "disconnected")),
-      );
+      .where(eq(stores.ownerUserId, userId));
     return row?.n ?? 0;
   }
 
-  /** Org'un efektif entitlement'ı (abonelik yoksa `free`). */
-  async getEntitlement(orgId: string): Promise<Entitlement> {
-    const row = await this.getRow(orgId);
+  /** Hesabın efektif entitlement'ı (abonelik yoksa `free`). */
+  async getEntitlement(userId: string): Promise<Entitlement> {
+    const row = await this.getRow(userId);
     if (!row || !ACTIVE_STATUSES.includes(row.status)) {
       return {
         plan: "free",
@@ -92,10 +91,10 @@ export class BillingService {
   }
 
   /** `GET /billing` — abonelik + kullanım + entitlement. */
-  async getState(orgId: string): Promise<BillingState> {
-    const row = await this.getRow(orgId);
-    const ent = await this.getEntitlement(orgId);
-    const storesCount = await this.countActiveStores(orgId);
+  async getState(userId: string): Promise<BillingState> {
+    const row = await this.getRow(userId);
+    const ent = await this.getEntitlement(userId);
+    const storesCount = await this.countStores(userId);
     return {
       plan: ent.plan,
       status: ent.status,
@@ -109,35 +108,22 @@ export class BillingService {
   }
 
   /**
-   * Yeni mağaza bağlanabilir mi? Limit aşılıyorsa 403. Var olan mağazanın
-   * yeniden bağlanması (reconnect) limitten muaftır.
+   * Kullanıcı yeni bir mağaza (store) oluşturabilir mi? Plan store limiti
+   * aşılıyorsa 403.
    */
-  async assertCanAddStore(orgId: string, externalShopId?: string): Promise<void> {
-    if (externalShopId) {
-      const [existing] = await this.db
-        .select({ id: stores.id })
-        .from(stores)
-        .where(
-          and(
-            eq(stores.organizationId, orgId),
-            eq(stores.externalShopId, externalShopId),
-          ),
-        )
-        .limit(1);
-      if (existing) return; // reconnect — limitten muaf
-    }
-    const ent = await this.getEntitlement(orgId);
-    const count = await this.countActiveStores(orgId);
+  async assertCanAddStore(userId: string): Promise<void> {
+    const ent = await this.getEntitlement(userId);
+    const count = await this.countStores(userId);
     if (count >= ent.storeLimit) {
       throw new ForbiddenException(
         `Mağaza limitine ulaşıldı (${count}/${ent.storeLimit}). ` +
-          `Daha fazla mağaza bağlamak için planınızı yükseltin.`,
+          `Daha fazla mağaza eklemek için planınızı yükseltin.`,
       );
     }
   }
 
   /** Hosted checkout başlat (canlı). Dev modda dev-activate kullanılmalı. */
-  async createCheckout(orgId: string, email: string, plan: PlanId): Promise<string> {
+  async createCheckout(userId: string, email: string, plan: PlanId): Promise<string> {
     if (!this.creem.isConfigured) {
       throw new BadRequestException(
         "Creem yapılandırılmadı (dev mod). Plan etkinleştirmek için dev-activate kullanın.",
@@ -152,15 +138,15 @@ export class BillingService {
       productId,
       successUrl: `${webOrigin}/billing?billing=success`,
       email,
-      requestId: orgId,
-      metadata: { organizationId: orgId, plan },
+      requestId: userId,
+      metadata: { userId, plan },
     });
     return checkoutUrl;
   }
 
   /** Müşteri portalı linki (abonelik/ödeme yönetimi). */
-  async createPortal(orgId: string): Promise<string> {
-    const row = await this.getRow(orgId);
+  async createPortal(userId: string): Promise<string> {
+    const row = await this.getRow(userId);
     if (!row?.creemCustomerId) {
       throw new BadRequestException("Yönetilecek aktif bir abonelik yok.");
     }
@@ -174,29 +160,29 @@ export class BillingService {
    * Dev/sentetik plan etkinleştirme (yalnız non-prod, Creem anahtarı yokken).
    * Webhook olmadan 14 günlük denemeyle abonelik kurar (e2e doğrulama için).
    */
-  async devActivate(orgId: string, plan: PlanId): Promise<BillingState> {
+  async devActivate(userId: string, plan: PlanId): Promise<BillingState> {
     if (this.config.get<string>("NODE_ENV") === "production") {
       throw new ForbiddenException("dev-activate üretimde kullanılamaz.");
     }
     const now = Date.now();
     const trialEnd = new Date(now + TRIAL_DAYS * 24 * 60 * 60 * 1000);
-    await this.upsert(orgId, {
+    await this.upsert(userId, {
       plan,
       status: "trialing",
-      creemCustomerId: `dev_cust_${orgId.slice(0, 8)}`,
-      creemSubscriptionId: `dev_sub_${orgId.slice(0, 8)}`,
+      creemCustomerId: `dev_cust_${userId.slice(0, 8)}`,
+      creemSubscriptionId: `dev_sub_${userId.slice(0, 8)}`,
       creemProductId: `dev_prod_${plan}`,
       trialEndsAt: trialEnd,
       currentPeriodEnd: trialEnd,
       cancelAtPeriodEnd: false,
       canceledAt: null,
     });
-    return this.getState(orgId);
+    return this.getState(userId);
   }
 
-  /** Org abonelik satırını upsert eder (org-tekil). */
+  /** Hesap abonelik satırını upsert eder (kullanıcı-tekil). */
   private async upsert(
-    orgId: string,
+    userId: string,
     values: {
       plan: PlanId;
       status: SubscriptionStatus;
@@ -211,9 +197,9 @@ export class BillingService {
   ): Promise<void> {
     await this.db
       .insert(subscriptions)
-      .values({ organizationId: orgId, ...values, updatedAt: new Date() })
+      .values({ userId, ...values, updatedAt: new Date() })
       .onConflictDoUpdate({
-        target: subscriptions.organizationId,
+        target: subscriptions.userId,
         set: { ...values, updatedAt: new Date() },
       });
   }
@@ -244,13 +230,13 @@ export class BillingService {
     const eventId = envelope.id;
     const eventType = envelope.eventType ?? envelope.type ?? "unknown";
     const object = envelope.object ?? {};
-    const orgId = this.resolveOrgId(object);
+    const userId = this.resolveUserId(object);
 
     // Idempotency: aynı event tekrar gelirse atla
     if (eventId) {
       const inserted = await this.db
         .insert(billingEvents)
-        .values({ creemEventId: eventId, eventType, organizationId: orgId, payload: envelope })
+        .values({ creemEventId: eventId, eventType, userId, payload: envelope })
         .onConflictDoNothing({ target: billingEvents.creemEventId })
         .returning({ id: billingEvents.id });
       if (inserted.length === 0) {
@@ -259,26 +245,25 @@ export class BillingService {
       }
     }
 
-    if (!orgId) {
-      this.logger.warn(`Webhook ${eventType} için org çözümlenemedi`);
+    if (!userId) {
+      this.logger.warn(`Webhook ${eventType} için kullanıcı çözümlenemedi`);
       return;
     }
 
-    await this.applyEvent(orgId, eventType, object);
+    await this.applyEvent(userId, eventType, object);
   }
 
-  /** object.metadata.organizationId → request_id → mevcut satır (creem id) ile org bul. */
-  private resolveOrgId(object: CreemObject): string | null {
+  /** object.metadata.userId → request_id ile hesabı (kullanıcı) bul. */
+  private resolveUserId(object: CreemObject): string | null {
     const sub = object.subscription ?? object;
-    const metaOrg =
-      object.metadata?.organizationId ?? sub.metadata?.organizationId ?? null;
-    if (metaOrg) return metaOrg;
+    const metaUser = object.metadata?.userId ?? sub.metadata?.userId ?? null;
+    if (metaUser) return metaUser;
     if (object.request_id) return object.request_id;
     return null;
   }
 
   private async applyEvent(
-    orgId: string,
+    userId: string,
     eventType: string,
     object: CreemObject,
   ): Promise<void> {
@@ -288,7 +273,7 @@ export class BillingService {
     const customerId = idOf(sub.customer) ?? idOf(object.customer);
     const plan =
       this.creem.planForProductId(productId) ??
-      (await this.getRow(orgId))?.plan ??
+      (await this.getRow(userId))?.plan ??
       "basic";
 
     let status: SubscriptionStatus;
@@ -301,7 +286,7 @@ export class BillingService {
     const periodEnd = parseDate(sub.current_period_end_date ?? sub.current_period_end);
     const canceledAt = parseDate(sub.canceled_at);
 
-    await this.upsert(orgId, {
+    await this.upsert(userId, {
       plan,
       status,
       creemCustomerId: customerId,
@@ -312,7 +297,7 @@ export class BillingService {
       cancelAtPeriodEnd: eventType === "subscription.scheduled_cancel" || Boolean(canceledAt && status !== "canceled"),
       canceledAt,
     });
-    this.logger.log(`Abonelik güncellendi org=${orgId} plan=${plan} durum=${status}`);
+    this.logger.log(`Abonelik güncellendi user=${userId} plan=${plan} durum=${status}`);
   }
 }
 

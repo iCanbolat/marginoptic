@@ -17,6 +17,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "dotenv -e .env -- drizzle-kit migrate",
+    "db:reset": "dotenv -e .env -- node scripts/reset-db.mjs && dotenv -e .env -- drizzle-kit migrate",
     "db:push": "dotenv -e .env -- drizzle-kit push",
     "db:studio": "dotenv -e .env -- drizzle-kit studio"
   },

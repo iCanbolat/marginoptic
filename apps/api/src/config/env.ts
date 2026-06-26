@@ -43,11 +43,6 @@ export const envSchema = z.object({
   TIKTOK_APP_ID: z.string().default(""),
   TIKTOK_APP_SECRET: z.string().default(""),
 
-  // Etsy (Faz 9) — OAuth2 PKCE, Open API v3. Anahtar yoksa canlı OAuth kapalı;
-  // dev-connect (sentetik) yine çalışır.
-  ETSY_API_KEY: z.string().default(""),
-  ETSY_API_SECRET: z.string().default(""),
-  ETSY_SCOPES: z.string().default("transactions_r listings_r shops_r"),
 
   // eBay (Faz 10) — OAuth2 authorization code, Sell API. Anahtar yoksa canlı OAuth
   // kapalı; dev-connect (sentetik) yine çalışır. Tazelik zamanlanmış polling ile.

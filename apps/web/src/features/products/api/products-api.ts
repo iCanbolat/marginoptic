@@ -58,16 +58,16 @@ export const productsApi = {
   // Manuel eşleştirme
   links: (storeId: string, productExternalId: string) =>
     apiGet<ProductAdLink[]>(
-      `/stores/${storeId}/product-ad-links?productExternalId=${encodeURIComponent(productExternalId)}`,
+      `/channels/${storeId}/product-ad-links?productExternalId=${encodeURIComponent(productExternalId)}`,
     ),
   adEntities: (storeId: string, provider?: AdProvider) =>
     apiGet<AdEntityOption[]>(
-      `/stores/${storeId}/product-ad-links/ad-entities${provider ? `?provider=${provider}` : ""}`,
+      `/channels/${storeId}/product-ad-links/ad-entities${provider ? `?provider=${provider}` : ""}`,
     ),
   createLink: (storeId: string, input: ProductAdLinkCreateInput) =>
-    apiPost<ProductAdLink>(`/stores/${storeId}/product-ad-links`, input),
+    apiPost<ProductAdLink>(`/channels/${storeId}/product-ad-links`, input),
   deleteLink: (storeId: string, id: string) =>
-    apiDelete<void>(`/stores/${storeId}/product-ad-links/${id}`),
+    apiDelete<void>(`/channels/${storeId}/product-ad-links/${id}`),
 
   // Tüm sağlayıcılardan senkron (tek buton + cooldown)
   syncAllStatus: () => apiGet<SyncAllStatus>("/integrations/sync-all"),

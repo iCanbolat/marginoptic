@@ -6,7 +6,7 @@ import { PRODUCT_LEVEL_AD_PROVIDERS, type AdProvider } from "@churnify/shared";
 import { CryptoService } from "../../../common/crypto/crypto.service";
 import { DRIZZLE, type DrizzleDB } from "../../../database/database.module";
 import { productProfitDaily } from "../../../database/schema/metrics";
-import { integrationConnections } from "../../../database/schema/stores";
+import { integrationConnections } from "../../../database/schema/channels";
 import { AdConnectorRegistry } from "../../integrations/ads/ad-connector.registry";
 import {
   generateSyntheticAds,
@@ -56,7 +56,7 @@ export class AdsSyncProcessor
   }
 
   async process(job: Job<AdsSyncJob>): Promise<void> {
-    const { connectionId, storeId, provider, externalAccountId, since, until } =
+    const { connectionId, channelId, provider, externalAccountId, since, until } =
       job.data ?? {};
 
     // Scheduler tetiği: aktif bağlantıları kuyruğa al.
@@ -70,7 +70,7 @@ export class AdsSyncProcessor
       .select({
         status: integrationConnections.status,
         accessTokenEnc: integrationConnections.accessTokenEnc,
-        storeId: integrationConnections.storeId,
+        channelId: integrationConnections.channelId,
         provider: integrationConnections.provider,
         externalAccountId: integrationConnections.externalAccountId,
       })
@@ -78,7 +78,7 @@ export class AdsSyncProcessor
       .where(eq(integrationConnections.id, connectionId))
       .limit(1);
 
-    const effectiveStoreId = storeId ?? conn?.storeId ?? null;
+    const effectiveStoreId = channelId ?? conn?.channelId ?? null;
     if (!conn || conn.status !== "active" || !conn.accessTokenEnc || !effectiveStoreId) {
       await this.sync.setSyncState(connectionId, ADS_RESOURCE, "error", {
         lastError: "Bağlantı aktif değil, token yok veya mağaza atanmamış",
@@ -148,11 +148,11 @@ export class AdsSyncProcessor
    * product_profit_daily join hedefiyle birebir eşleşir (rollup satış senkronundan
    * önce çalıştıysa boş dönebilir → sentetik ürün-harcama boş kalır, blended fallback).
    */
-  private async storeProductExternalIds(storeId: string): Promise<string[]> {
+  private async storeProductExternalIds(channelId: string): Promise<string[]> {
     const rows = await this.db
       .selectDistinct({ id: productProfitDaily.productExternalId })
       .from(productProfitDaily)
-      .where(eq(productProfitDaily.storeId, storeId))
+      .where(eq(productProfitDaily.channelId, channelId))
       .orderBy(productProfitDaily.productExternalId)
       .limit(8);
     return rows.map((r) => r.id).filter((id) => id && id !== "unknown");

@@ -21,7 +21,7 @@ export interface MaterializableExpense {
 }
 
 export interface AllocationRow {
-  storeId: string;
+  channelId: string;
   date: string; // YYYY-MM-DD
   amount: string; // 4-ondalık string
 }
@@ -79,7 +79,7 @@ export function computeDailyAmount(
 
 /**
  * Gideri [from, to] aralığında hedef mağazalara yayar.
- * `storeIds` çağıran tarafça verilir: allocation=store → [storeId];
+ * `storeIds` çağıran tarafça verilir: allocation=store → [channelId];
  * allocation=spread → org'un aktif mağazaları (günlük tutar eşit bölünür).
  * Tutarı 0 olan günler atlanır.
  */
@@ -97,7 +97,7 @@ export function buildAllocations(
     const perStore = daily / storeIds.length;
     if (perStore <= 0) continue;
     const amount = perStore.toFixed(4);
-    for (const storeId of storeIds) rows.push({ storeId, date, amount });
+    for (const channelId of storeIds) rows.push({ channelId, date, amount });
   }
   return rows;
 }

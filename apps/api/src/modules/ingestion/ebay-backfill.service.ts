@@ -12,7 +12,7 @@ import {
 export type BackfillProgress = (processed: number, total: number) => Promise<void>;
 
 interface EbayBackfillArgs {
-  storeId: string;
+  channelId: string;
   /** eBay satıcı kimliği (canlı fetch için); dev'de mağaza adı (sentetik seed). */
   shopId: string;
   accessToken: string;
@@ -26,7 +26,7 @@ const PROGRESS_EVERY = 25;
 /**
  * Faz 10 — eBay tarihsel/artımlı veri backfill'i. Dev token (`dev_`) → sentetik API-şekilli
  * veri; aksi halde eBay Sell API. Her iki yol da aynı normalizer + IngestionService idempotent
- * upsert'ini kullanır (Etsy backfill ile aynı desen).
+ * upsert'ini kullanır (Shopify backfill ile aynı desen).
  */
 @Injectable()
 export class EbayBackfillService {
@@ -66,14 +66,14 @@ export class EbayBackfillService {
     switch (args.resource) {
       case "orders":
         for (const n of nodes) {
-          await this.ingestion.upsertOrder(args.storeId, normalizeEbayOrder(n));
+          await this.ingestion.upsertOrder(args.channelId, normalizeEbayOrder(n));
           await tick();
         }
         break;
       case "products":
         for (const n of nodes) {
           await this.ingestion.upsertProduct(
-            args.storeId,
+            args.channelId,
             normalizeEbayInventoryItem(n),
           );
           await tick();
@@ -81,7 +81,7 @@ export class EbayBackfillService {
         break;
       case "customers":
         for (const n of nodes) {
-          await this.ingestion.upsertCustomer(args.storeId, normalizeEbayBuyer(n));
+          await this.ingestion.upsertCustomer(args.channelId, normalizeEbayBuyer(n));
           await tick();
         }
         break;

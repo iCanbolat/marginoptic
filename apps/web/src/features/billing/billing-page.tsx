@@ -56,8 +56,8 @@ function trialDaysLeft(iso: string | null): number | null {
 
 export function BillingPage() {
   const qc = useQueryClient();
-  const activeOrg = useAuthStore((s) => s.activeOrg);
-  const canManage = activeOrg?.role === "owner" || activeOrg?.role === "admin";
+  const activeStore = useAuthStore((s) => s.activeStore);
+  const canManage = true;
 
   const stateQ = useQuery({ queryKey: ["billing"], queryFn: billingApi.state });
 
@@ -122,7 +122,7 @@ export function BillingPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Faturalandırma</h1>
         <p className="text-sm text-muted-foreground">
-          {activeOrg?.name} için abonelik planı. Her plan{" "}
+          {activeStore?.name} için abonelik planı. Her plan{" "}
           <strong>14 gün ücretsiz deneme</strong> içerir.
         </p>
       </div>

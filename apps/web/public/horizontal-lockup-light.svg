@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="150" viewBox="0 0 620 150" fill="none" role="img" aria-label="MarginOptic">
+  <defs>
+
+    <marker id="mo-arrow-lk" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="26" refX="20" refY="13" orient="auto">
+      <path d="M2 1 L24 13 L2 25 L9 13 Z" fill="#C44948"></path>
+    </marker>
+    <mask id="mo-cut-lk" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="#fff"></rect>
+      <path d="M15 106 Q57 92 111 31" stroke="#000" stroke-width="18" fill="none" stroke-linecap="round"></path>
+    </mask>
+  </defs>
+  <g transform="translate(6,27) scale(0.78)">
+    <path d="M26 103 L26 29 L64 75 L102 29 L102 103" stroke="#A50436" stroke-width="17" stroke-linejoin="miter" mask="url(#mo-cut-lk)"></path>
+    <path d="M15 106 Q57 92 105 36" stroke="#C44948" stroke-width="8.5" fill="none" stroke-linecap="round" marker-end="url(#mo-arrow-lk)"></path>
+  </g>
+  <text x="106" y="78" font-family="Oxanium, sans-serif" font-weight="700" font-size="56" letter-spacing="-1.1">
+    <tspan fill="#2C221F">Margin</tspan><tspan fill="#A50436">Optic</tspan>
+  </text>
+  <text x="108" y="104" font-family="'Space Mono', monospace" font-size="12.5" letter-spacing="3.6" fill="#7A6F6A">MULTI-CHANNEL PROFIT TRACKING</text>
+</svg>

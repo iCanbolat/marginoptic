@@ -13,7 +13,6 @@ import type {
   WidgetType,
 } from "@churnify/shared";
 import { dashboardsApi } from "@/lib/api";
-import { useAuthStore } from "@/lib/auth/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -29,7 +28,6 @@ import { CustomMetricsDialog } from "./custom-metrics-dialog";
 import { WIDGET_DEFAULTS } from "./metric-catalog";
 import type { DashFilter } from "./use-analytics";
 
-const EDIT_ROLES = ["owner", "admin", "analyst"];
 const newId = () => `w-${Math.random().toString(36).slice(2, 9)}`;
 const daysAgoIso = (n: number): string => {
   const d = new Date();
@@ -65,8 +63,7 @@ function starterWidgets(): DashboardWidget[] {
 
 export function DashboardPage() {
   const qc = useQueryClient();
-  const role = useAuthStore((s) => s.activeOrg?.role);
-  const canEdit = role != null && EDIT_ROLES.includes(role);
+  const canEdit = true;
 
   const [range, setRange] = useState<DateRangeValue>({
     from: daysAgoIso(29),

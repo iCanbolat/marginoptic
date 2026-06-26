@@ -11,9 +11,9 @@ import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
 import { orders } from "../../database/schema/sales";
 import {
   integrationConnections,
-  stores,
+  channels,
   syncState,
-} from "../../database/schema/stores";
+} from "../../database/schema/channels";
 
 /** Faz 3 okuma tarafı: sync durumu + ham sipariş listesi (org-kapsamlı). */
 @Injectable()
@@ -21,17 +21,17 @@ export class IngestionQueryService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
   /** Mağazanın org'a ait olduğunu doğrular (yoksa 404). */
-  private async assertStore(orgId: string, storeId: string): Promise<void> {
+  private async assertStore(storeId: string, channelId: string): Promise<void> {
     const [row] = await this.db
-      .select({ id: stores.id })
-      .from(stores)
-      .where(and(eq(stores.id, storeId), eq(stores.organizationId, orgId)))
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(eq(channels.id, channelId), eq(channels.storeId, storeId)))
       .limit(1);
     if (!row) throw new NotFoundException("Mağaza bulunamadı");
   }
 
-  async syncStatus(orgId: string, storeId: string): Promise<StoreSyncStatus> {
-    await this.assertStore(orgId, storeId);
+  async syncStatus(storeId: string, channelId: string): Promise<StoreSyncStatus> {
+    await this.assertStore(storeId, channelId);
 
     const rows = await this.db
       .select({
@@ -47,7 +47,7 @@ export class IngestionQueryService {
         integrationConnections,
         eq(syncState.connectionId, integrationConnections.id),
       )
-      .where(eq(integrationConnections.storeId, storeId))
+      .where(eq(integrationConnections.channelId, channelId))
       .orderBy(syncState.resource);
 
     const resources: SyncResourceStatus[] = rows.map((r) => {
@@ -70,7 +70,7 @@ export class IngestionQueryService {
       .at(-1) ?? null;
 
     return {
-      storeId,
+      channelId,
       resources,
       complete:
         resources.length > 0 && resources.every((r) => r.status === "done"),
@@ -79,13 +79,13 @@ export class IngestionQueryService {
   }
 
   async listOrders(
-    orgId: string,
     storeId: string,
+    channelId: string,
     query: OrdersQuery,
   ): Promise<Paginated<OrderRow>> {
-    await this.assertStore(orgId, storeId);
+    await this.assertStore(storeId, channelId);
 
-    const conds = [eq(orders.storeId, storeId)];
+    const conds = [eq(orders.channelId, channelId)];
     if (query.financialStatus) {
       conds.push(eq(orders.financialStatus, query.financialStatus));
     }

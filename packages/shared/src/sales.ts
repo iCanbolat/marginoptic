@@ -22,7 +22,7 @@ export interface SyncResourceStatus {
 
 /** Bir mağazanın tüm kaynaklarının sync özeti (backfill ilerleme UI'ı bunu okur). */
 export interface StoreSyncStatus {
-  storeId: string;
+  channelId: string;
   resources: SyncResourceStatus[];
   /** Tüm kaynaklar `done` mu? */
   complete: boolean;

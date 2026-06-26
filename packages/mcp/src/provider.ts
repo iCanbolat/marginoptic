@@ -15,9 +15,9 @@ import type {
  * kod yolu → aynı sonuç). Bu paket NestJS/SDK'dan bağımsızdır.
  */
 
-/** Tool çağrı bağlamı (kimlik doğrulamadan gelen org). */
+/** Tool çağrı bağlamı (aktif mağaza (store)). */
 export interface McpToolContext {
-  orgId: string;
+  storeId: string;
 }
 
 /** list_stores satırı. */

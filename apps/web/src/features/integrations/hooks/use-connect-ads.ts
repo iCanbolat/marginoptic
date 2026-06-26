@@ -7,7 +7,7 @@ import { integrationKeys } from "./integration-keys";
 
 interface AdInstallVars {
   provider: AdProvider;
-  storeId: string;
+  channelId: string;
 }
 
 interface AdDevConnectVars extends AdInstallVars {
@@ -24,8 +24,8 @@ export function useConnectAds() {
   };
 
   const install = useMutation({
-    mutationFn: ({ provider, storeId }: AdInstallVars) =>
-      integrationApi.adInstall(provider, storeId),
+    mutationFn: ({ provider, channelId }: AdInstallVars) =>
+      integrationApi.adInstall(provider, channelId),
     onSuccess: (res) => {
       window.location.href = res.url;
     },
@@ -34,8 +34,8 @@ export function useConnectAds() {
   });
 
   const devConnect = useMutation({
-    mutationFn: ({ provider, storeId, externalAccountId }: AdDevConnectVars) =>
-      integrationApi.adDevConnect(provider, { storeId, externalAccountId }),
+    mutationFn: ({ provider, channelId, externalAccountId }: AdDevConnectVars) =>
+      integrationApi.adDevConnect(provider, { channelId, externalAccountId }),
     onSuccess: () => {
       toast.success("Reklam hesabı bağlandı (dev)");
       invalidate();

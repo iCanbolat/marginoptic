@@ -3,7 +3,7 @@ import type {
   AdProvider,
   IntegrationsOverview,
   ShopifyInstallResponse,
-  StoreSummary,
+  ChannelSummary,
   StoreTrackingInfo,
 } from "@churnify/shared";
 import { apiDelete, apiGet, apiPost } from "@/lib/api-client";
@@ -28,12 +28,6 @@ export const integrationApi = {
     }),
   shopifyDevConnect: (shop: string) =>
     apiPost<ConnectResult>("/integrations/shopify/dev-connect", { shop }),
-
-  // Etsy
-  etsyInstall: () =>
-    apiGet<ShopifyInstallResponse>("/integrations/etsy/install"),
-  etsyDevConnect: (shop: string) =>
-    apiPost<ConnectResult>("/integrations/etsy/dev-connect", { shop }),
 
   // eBay
   ebayInstall: () =>
@@ -63,9 +57,9 @@ export const integrationApi = {
     apiDelete<void>(`/integrations/${connectionId}`),
 
   // Reklam hesabı bağlama formu için mağaza listesi.
-  listStores: () => apiGet<StoreSummary[]>("/stores"),
+  listStores: () => apiGet<ChannelSummary[]>("/channels"),
 
   // Dönüşüm izleme (Web Pixel Account ID) — Shopify mağazası bazında.
   storeTracking: (storeId: string) =>
-    apiGet<StoreTrackingInfo>(`/stores/${storeId}/tracking`),
+    apiGet<StoreTrackingInfo>(`/channels/${storeId}/tracking`),
 };

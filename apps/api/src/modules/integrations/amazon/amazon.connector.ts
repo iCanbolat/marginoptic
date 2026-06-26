@@ -30,7 +30,7 @@ const REGIONS = {
 /**
  * Faz 10 — Amazon connector (Selling Partner API, Login with Amazon).
  *
- * Etsy/eBay gibi Shopify'ın `OAuthConnector` arayüzünü uygulamaz (Amazon webhook'ları
+ * eBay gibi Shopify'ın `OAuthConnector` arayüzünü uygulamaz (Amazon webhook'ları
  * SQS/EventBridge üzerinden gider, basit HTTP push yok; tazelik **zamanlanmış polling**
  * ile sağlanır). SP-API artık AWS SigV4 imzası istemez — yalnız LWA access token yeterli.
  * Access token ~1 saat ömürlüdür → fetch öncesi refresh edilir. `AMAZON_LWA_CLIENT_ID`

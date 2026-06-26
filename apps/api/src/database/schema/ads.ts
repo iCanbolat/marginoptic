@@ -10,7 +10,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { integrationConnections, integrationProvider, stores } from "./stores";
+import { integrationConnections, integrationProvider, channels } from "./channels";
 
 /** Para alanları için ortak tip (sales/costs/metrics ile aynı): 20 basamak / 4 ondalık. */
 const money = (name: string) => numeric(name, { precision: 20, scale: 4 });
@@ -30,9 +30,9 @@ export const adEntities = pgTable(
   "ad_entities",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     connectionId: uuid("connection_id")
       .notNull()
       .references(() => integrationConnections.id, { onDelete: "cascade" }),
@@ -55,11 +55,11 @@ export const adEntities = pgTable(
   },
   (t) => [
     uniqueIndex("uq_ad_entity_store_provider_external").on(
-      t.storeId,
+      t.channelId,
       t.provider,
       t.externalId,
     ),
-    index("idx_ad_entity_store_level").on(t.storeId, t.provider, t.level),
+    index("idx_ad_entity_store_level").on(t.channelId, t.provider, t.level),
   ],
 );
 
@@ -68,9 +68,9 @@ export const adSpend = pgTable(
   "ad_spend",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     connectionId: uuid("connection_id")
       .notNull()
       .references(() => integrationConnections.id, { onDelete: "cascade" }),
@@ -95,12 +95,12 @@ export const adSpend = pgTable(
   },
   (t) => [
     uniqueIndex("uq_ad_spend_store_provider_entity_date").on(
-      t.storeId,
+      t.channelId,
       t.provider,
       t.entityExternalId,
       t.date,
     ),
-    index("idx_ad_spend_store_date").on(t.storeId, t.date),
-    index("idx_ad_spend_store_level_date").on(t.storeId, t.level, t.date),
+    index("idx_ad_spend_store_date").on(t.channelId, t.date),
+    index("idx_ad_spend_store_level_date").on(t.channelId, t.level, t.date),
   ],
 );

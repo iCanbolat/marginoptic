@@ -20,16 +20,16 @@ import {
 } from "../../database/schema/product-analytics";
 import { REDIS } from "../../redis/redis.module";
 import { f4, num } from "./analytics-math";
-import { resolveOrgStores, type OrgStore } from "./org-stores";
+import { resolveStoreChannels, type StoreChannel } from "./store-channels";
 
 const CACHE_TTL = 300;
 
-/** Bu sayfada gösterilen kanallar (Etsy hariç). */
+/** Bu sayfada gösterilen kanallar. */
 const PAGE_CHANNELS = new Set(["shopify", "amazon", "ebay"]);
 
 /** Birleşik ürün satırı (kâr + traffic + eşleştirme), bellek-içi hesaplanır. */
 interface CombinedRow {
-  storeId: string;
+  channelId: string;
   storeName: string;
   channel: ProductAnalyticsChannel;
   productExternalId: string;
@@ -49,7 +49,7 @@ const ratio = (n: number, d: number): number | null =>
   d > 0 ? Math.round((n / d) * 1e4) / 1e4 : null;
 
 /**
- * Ürün Analizi okuma katmanı (org-kapsamlı, Etsy hariç). Overview 4 kartı +
+ * Ürün Analizi okuma katmanı (org-kapsamlı). Overview 4 kartı +
  * ürün tablosu (ürün-bazlı ROAS / reklam harcaması / dönüşüm). product_profit_daily
  * + product_traffic_daily + product_ad_links/product_ad_spend_daily birleştirilir.
  */
@@ -63,18 +63,18 @@ export class ProductAnalyticsService {
   // ---- Overview (4 kart) ----
 
   async overview(
-    orgId: string,
+    storeId: string,
     filter: AnalyticsFilter,
   ): Promise<ProductOverviewResponse> {
-    const key = `analytics:${orgId}:product-overview:${filter.from}:${filter.to}:${
+    const key = `analytics:${storeId}:product-overview:${filter.from}:${filter.to}:${
       filter.storeIds.length ? [...filter.storeIds].sort().join(",") : "all"
     }`;
     const hit = await this.redis.get(key);
     if (hit) return JSON.parse(hit) as ProductOverviewResponse;
 
-    const stores = await this.pageStores(orgId, filter.storeIds);
-    const ids = stores.map((s) => s.id);
-    const currency = stores[0]?.currency ?? "USD";
+    const channels = await this.pageStores(storeId, filter.storeIds);
+    const ids = channels.map((s) => s.id);
+    const currency = channels[0]?.currency ?? "USD";
     const empty = (): ProductOverviewCard => ({
       productExternalId: null,
       title: null,
@@ -96,7 +96,7 @@ export class ProductAnalyticsService {
         topByConversionRate: empty(),
       };
     } else {
-      const rows = await this.loadCombined(stores, filter.from, filter.to);
+      const rows = await this.loadCombined(channels, filter.from, filter.to);
       const top = (
         pick: (r: CombinedRow) => number,
         value: (r: CombinedRow) => string,
@@ -149,13 +149,13 @@ export class ProductAnalyticsService {
   // ---- Ürün tablosu ----
 
   async table(
-    orgId: string,
+    storeId: string,
     query: ProductTableQuery,
   ): Promise<ProductTableResponse> {
-    const stores = await this.pageStores(orgId, []);
+    const channels = await this.pageStores(storeId, []);
     const filtered = query.channel
-      ? stores.filter((s) => s.channel === query.channel)
-      : stores;
+      ? channels.filter((s) => s.channel === query.channel)
+      : channels;
     const ids = filtered.map((s) => s.id);
     if (ids.length === 0) {
       return {
@@ -211,7 +211,7 @@ export class ProductAnalyticsService {
       pageSize: query.pageSize,
       rows: pageRows.map(
         (r): ProductAnalyticsRow => ({
-          storeId: r.storeId,
+          channelId: r.channelId,
           storeName: r.storeName,
           channel: r.channel,
           productExternalId: r.productExternalId,
@@ -232,13 +232,13 @@ export class ProductAnalyticsService {
 
   // ---- Yardımcılar ----
 
-  /** Org mağazaları, Etsy ve bilinmeyen kanallar çıkarılmış. */
+  /** Org mağazaları, bilinmeyen kanallar çıkarılmış. */
   private async pageStores(
-    orgId: string,
+    storeId: string,
     requestedIds: string[],
-  ): Promise<OrgStore[]> {
-    const stores = await resolveOrgStores(this.db, orgId, requestedIds);
-    return stores.filter((s) => PAGE_CHANNELS.has(s.channel));
+  ): Promise<StoreChannel[]> {
+    const channels = await resolveStoreChannels(this.db, storeId, requestedIds);
+    return channels.filter((s) => PAGE_CHANNELS.has(s.channel));
   }
 
   /**
@@ -247,18 +247,18 @@ export class ProductAnalyticsService {
    * eşleştirme durumu (manuel link > otomatik ürün-harcama > yok).
    */
   private async loadCombined(
-    stores: OrgStore[],
+    channels: StoreChannel[],
     from: string,
     to: string,
   ): Promise<CombinedRow[]> {
-    const ids = stores.map((s) => s.id);
+    const ids = channels.map((s) => s.id);
     const meta = new Map(
-      stores.map((s) => [s.id, { name: s.name, channel: s.channel }]),
+      channels.map((s) => [s.id, { name: s.name, channel: s.channel }]),
     );
 
     const profitRows = await this.db
       .select({
-        storeId: productProfitDaily.storeId,
+        channelId: productProfitDaily.channelId,
         productExternalId: productProfitDaily.productExternalId,
         title: sql<string | null>`max(${productProfitDaily.title})`,
         currency: sql<string>`max(${productProfitDaily.currency})`,
@@ -271,18 +271,18 @@ export class ProductAnalyticsService {
       .from(productProfitDaily)
       .where(
         and(
-          inArray(productProfitDaily.storeId, ids),
+          inArray(productProfitDaily.channelId, ids),
           between(productProfitDaily.date, from, to),
         ),
       )
       .groupBy(
-        productProfitDaily.storeId,
+        productProfitDaily.channelId,
         productProfitDaily.productExternalId,
       );
 
     const trafficRows = await this.db
       .select({
-        storeId: productTrafficDaily.storeId,
+        channelId: productTrafficDaily.channelId,
         productExternalId: productTrafficDaily.productExternalId,
         sessions: sql<number>`sum(${productTrafficDaily.sessions})::int`,
         purchases: sql<number>`sum(${productTrafficDaily.purchases})::int`,
@@ -290,64 +290,64 @@ export class ProductAnalyticsService {
       .from(productTrafficDaily)
       .where(
         and(
-          inArray(productTrafficDaily.storeId, ids),
+          inArray(productTrafficDaily.channelId, ids),
           between(productTrafficDaily.date, from, to),
         ),
       )
       .groupBy(
-        productTrafficDaily.storeId,
+        productTrafficDaily.channelId,
         productTrafficDaily.productExternalId,
       );
     const trafficByKey = new Map(
       trafficRows.map((r) => [
-        `${r.storeId}:${r.productExternalId}`,
+        `${r.channelId}:${r.productExternalId}`,
         { sessions: r.sessions, purchases: r.purchases },
       ]),
     );
 
     const manualRows = await this.db
       .selectDistinct({
-        storeId: productAdLinks.storeId,
+        channelId: productAdLinks.channelId,
         productExternalId: productAdLinks.productExternalId,
       })
       .from(productAdLinks)
       .where(
         and(
-          inArray(productAdLinks.storeId, ids),
+          inArray(productAdLinks.channelId, ids),
           eq(productAdLinks.matchType, "manual"),
         ),
       );
     const manualSet = new Set(
-      manualRows.map((r) => `${r.storeId}:${r.productExternalId}`),
+      manualRows.map((r) => `${r.channelId}:${r.productExternalId}`),
     );
 
     const autoRows = await this.db
       .selectDistinct({
-        storeId: productAdSpendDaily.storeId,
+        channelId: productAdSpendDaily.channelId,
         productExternalId: productAdSpendDaily.productExternalId,
       })
       .from(productAdSpendDaily)
       .where(
         and(
-          inArray(productAdSpendDaily.storeId, ids),
+          inArray(productAdSpendDaily.channelId, ids),
           between(productAdSpendDaily.date, from, to),
         ),
       );
     const autoSet = new Set(
-      autoRows.map((r) => `${r.storeId}:${r.productExternalId}`),
+      autoRows.map((r) => `${r.channelId}:${r.productExternalId}`),
     );
 
     return profitRows.map((r): CombinedRow => {
-      const key = `${r.storeId}:${r.productExternalId}`;
+      const key = `${r.channelId}:${r.productExternalId}`;
       const traffic = trafficByKey.get(key);
-      const m = meta.get(r.storeId);
+      const m = meta.get(r.channelId);
       const mappingStatus: ProductMappingStatus = manualSet.has(key)
         ? "manual"
         : autoSet.has(key)
           ? "auto"
           : "none";
       return {
-        storeId: r.storeId,
+        channelId: r.channelId,
         storeName: m?.name ?? "—",
         channel: (m?.channel ?? "shopify") as ProductAnalyticsChannel,
         productExternalId: r.productExternalId,

@@ -38,17 +38,17 @@ export class CustomMetricsService {
     private readonly analytics: AnalyticsService,
   ) {}
 
-  async list(orgId: string): Promise<CustomMetricSummary[]> {
+  async list(storeId: string): Promise<CustomMetricSummary[]> {
     const rows = await this.db
       .select()
       .from(customMetrics)
-      .where(eq(customMetrics.organizationId, orgId))
+      .where(eq(customMetrics.storeId, storeId))
       .orderBy(asc(customMetrics.name));
     return rows.map(toSummary);
   }
 
   async create(
-    orgId: string,
+    storeId: string,
     input: CustomMetricCreateInput,
   ): Promise<CustomMetricSummary> {
     this.assertFormula(input.formula);
@@ -56,7 +56,7 @@ export class CustomMetricsService {
       const [row] = await this.db
         .insert(customMetrics)
         .values({
-          organizationId: orgId,
+          storeId: storeId,
           name: input.name,
           formula: input.formula,
           format: input.format,
@@ -69,11 +69,11 @@ export class CustomMetricsService {
   }
 
   async update(
-    orgId: string,
+    storeId: string,
     id: string,
     input: CustomMetricUpdateInput,
   ): Promise<CustomMetricSummary> {
-    await this.assertExists(orgId, id);
+    await this.assertExists(storeId, id);
     if (input.formula !== undefined) this.assertFormula(input.formula);
     try {
       const [row] = await this.db
@@ -87,7 +87,7 @@ export class CustomMetricsService {
         .where(
           and(
             eq(customMetrics.id, id),
-            eq(customMetrics.organizationId, orgId),
+            eq(customMetrics.storeId, storeId),
           ),
         )
         .returning();
@@ -97,23 +97,23 @@ export class CustomMetricsService {
     }
   }
 
-  async remove(orgId: string, id: string): Promise<void> {
-    await this.assertExists(orgId, id);
+  async remove(storeId: string, id: string): Promise<void> {
+    await this.assertExists(storeId, id);
     await this.db
       .delete(customMetrics)
       .where(
-        and(eq(customMetrics.id, id), eq(customMetrics.organizationId, orgId)),
+        and(eq(customMetrics.id, id), eq(customMetrics.storeId, storeId)),
       );
   }
 
   /** Org'un tüm özel metriklerini verilen filtre için değerlendirir. */
   async values(
-    orgId: string,
+    storeId: string,
     filter: AnalyticsFilter,
   ): Promise<CustomMetricValuesResponse> {
-    const metrics = await this.list(orgId);
+    const metrics = await this.list(storeId);
     const { currency, storeIds, values } = await this.analytics.fieldValues(
-      orgId,
+      storeId,
       filter,
     );
     return {
@@ -143,12 +143,12 @@ export class CustomMetricsService {
     }
   }
 
-  private async assertExists(orgId: string, id: string): Promise<void> {
+  private async assertExists(storeId: string, id: string): Promise<void> {
     const [row] = await this.db
       .select({ id: customMetrics.id })
       .from(customMetrics)
       .where(
-        and(eq(customMetrics.id, id), eq(customMetrics.organizationId, orgId)),
+        and(eq(customMetrics.id, id), eq(customMetrics.storeId, storeId)),
       )
       .limit(1);
     if (!row) throw new NotFoundException("Özel metrik bulunamadı");

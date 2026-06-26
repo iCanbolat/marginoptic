@@ -20,7 +20,7 @@ import {
   productAdLinks,
   productAdSpendDaily,
 } from "../../database/schema/product-analytics";
-import { stores } from "../../database/schema/stores";
+import { channels } from "../../database/schema/channels";
 import { REDIS } from "../../redis/redis.module";
 import { assertStoreInOrg } from "../costs/store-access";
 import { ContributionService, type DateRange } from "./contribution.service";
@@ -73,20 +73,20 @@ export class MetricsService {
    * Bir mağazanın metriklerini yeniden hesaplar.
    * `range` verilmezse tam (mağazanın tüm tarihleri), verilirse yalnız o aralık.
    */
-  async rollupStore(storeId: string, range?: DateRange): Promise<number> {
+  async rollupStore(channelId: string, range?: DateRange): Promise<number> {
     const [store] = await this.db
       .select({
-        currency: stores.currency,
-        organizationId: stores.organizationId,
+        currency: channels.currency,
+        storeId: channels.storeId,
       })
-      .from(stores)
-      .where(eq(stores.id, storeId))
+      .from(channels)
+      .where(eq(channels.id, channelId))
       .limit(1);
     if (!store) return 0;
     const currency = store.currency;
 
     const contributions = await this.contributions.computeStoreContributions(
-      storeId,
+      channelId,
       currency,
       range,
     );
@@ -141,7 +141,7 @@ export class MetricsService {
     }
 
     // Dağıtılmış özel giderler (sipariş olmayan günlerde de gün oluşturur).
-    const allocConds = [eq(expenseAllocations.storeId, storeId)];
+    const allocConds = [eq(expenseAllocations.channelId, channelId)];
     if (range) {
       allocConds.push(between(expenseAllocations.date, range.from, range.to));
     }
@@ -158,7 +158,7 @@ export class MetricsService {
 
     // Reklam harcaması (blended): campaign seviyesi gün toplamı → gün+mağaza ad_spend.
     const adConds = [
-      eq(adSpend.storeId, storeId),
+      eq(adSpend.channelId, channelId),
       eq(adSpend.level, "campaign"),
     ];
     if (range) {
@@ -179,7 +179,7 @@ export class MetricsService {
     // Ürün-seviyesi reklam atfı: ürün-seviyesi raporlar (product_ad_spend_daily)
     // + manuel eşleştirme allokasyonu (product_ad_links) öncelikli; artakalan
     // (eşlenmemiş) günlük harcama eşlemesiz ürünlere ciro-payı ile dağıtılır.
-    await this.attributeProductAdSpend(storeId, range, products, daily);
+    await this.attributeProductAdSpend(channelId, range, products, daily);
 
     // Yaz (idempotent: aralığı/mağazayı temizle, yeniden ekle).
     await this.db.transaction(async (tx) => {
@@ -188,7 +188,7 @@ export class MetricsService {
           .delete(dailyStoreMetrics)
           .where(
             and(
-              eq(dailyStoreMetrics.storeId, storeId),
+              eq(dailyStoreMetrics.channelId, channelId),
               between(dailyStoreMetrics.date, range.from, range.to),
             ),
           );
@@ -196,23 +196,23 @@ export class MetricsService {
           .delete(productProfitDaily)
           .where(
             and(
-              eq(productProfitDaily.storeId, storeId),
+              eq(productProfitDaily.channelId, channelId),
               between(productProfitDaily.date, range.from, range.to),
             ),
           );
       } else {
         await tx
           .delete(dailyStoreMetrics)
-          .where(eq(dailyStoreMetrics.storeId, storeId));
+          .where(eq(dailyStoreMetrics.channelId, channelId));
         await tx
           .delete(productProfitDaily)
-          .where(eq(productProfitDaily.storeId, storeId));
+          .where(eq(productProfitDaily.channelId, channelId));
       }
 
       if (daily.size > 0) {
         await tx.insert(dailyStoreMetrics).values(
           [...daily.entries()].map(([date, b]) => ({
-            storeId,
+            channelId,
             date,
             currency,
             revenue: f4(b.revenue),
@@ -233,7 +233,7 @@ export class MetricsService {
       if (products.size > 0) {
         await tx.insert(productProfitDaily).values(
           [...products.values()].map((p) => ({
-            storeId,
+            channelId,
             date: p.date,
             productExternalId: p.productExternalId,
             title: p.title,
@@ -248,9 +248,9 @@ export class MetricsService {
       }
     });
 
-    await this.invalidateStore(storeId, store.organizationId);
+    await this.invalidateStore(channelId, store.storeId);
     this.logger.log(
-      `Rollup mağaza=${storeId}${range ? ` ${range.from}→${range.to}` : " (tam)"}: ${daily.size} gün, ${products.size} ürün-gün`,
+      `Rollup mağaza=${channelId}${range ? ` ${range.from}→${range.to}` : " (tam)"}: ${daily.size} gün, ${products.size} ürün-gün`,
     );
     return daily.size;
   }
@@ -263,13 +263,13 @@ export class MetricsService {
    * yoksa davranış eski blended ciro-payına indirgenir (geri uyumlu).
    */
   private async attributeProductAdSpend(
-    storeId: string,
+    channelId: string,
     range: DateRange | undefined,
     products: Map<string, ProductAccumulator>,
     daily: Map<string, DailyMetricsAccumulator>,
   ): Promise<void> {
     // 1) Açık ürün-seviyesi harcama (auto raporlar + sentetik): date|pid → spend
-    const espConds = [eq(productAdSpendDaily.storeId, storeId)];
+    const espConds = [eq(productAdSpendDaily.channelId, channelId)];
     if (range) {
       espConds.push(between(productAdSpendDaily.date, range.from, range.to));
     }
@@ -298,13 +298,13 @@ export class MetricsService {
         weight: productAdLinks.weight,
       })
       .from(productAdLinks)
-      .where(eq(productAdLinks.storeId, storeId));
+      .where(eq(productAdLinks.channelId, channelId));
 
     const manual = new Map<string, number>(); // date|pid → spend
     if (links.length > 0) {
       const entityIds = [...new Set(links.map((l) => l.entityExternalId))];
       const adConds = [
-        eq(adSpend.storeId, storeId),
+        eq(adSpend.channelId, channelId),
         inArray(adSpend.entityExternalId, entityIds),
       ];
       if (range) adConds.push(between(adSpend.date, range.from, range.to));
@@ -388,9 +388,9 @@ export class MetricsService {
   /** Tüm aktif mağazaları tam yeniden hesaplar (gece scheduler). */
   async rollupAllActive(): Promise<number> {
     const active = await this.db
-      .select({ id: stores.id })
-      .from(stores)
-      .where(eq(stores.status, "active"));
+      .select({ id: channels.id })
+      .from(channels)
+      .where(eq(channels.status, "active"));
     let total = 0;
     for (const s of active) total += await this.rollupStore(s.id);
     return total;
@@ -402,22 +402,22 @@ export class MetricsService {
   }
 
   /** Manuel yeniden hesaplama: org-sahipliği doğrula, tam rollup kuyruğa al. */
-  async requestRecompute(orgId: string, storeId: string): Promise<void> {
-    await assertStoreInOrg(this.db, orgId, storeId);
-    await this.enqueueRollup({ storeId });
+  async requestRecompute(storeId: string, channelId: string): Promise<void> {
+    await assertStoreInOrg(this.db, storeId, channelId);
+    await this.enqueueRollup({ channelId });
   }
 
   // ---- okuma (cache'li) ----
 
   async getStoreMetrics(
-    orgId: string,
     storeId: string,
+    channelId: string,
     from: string,
     to: string,
   ): Promise<StoreMetricsSummary> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
 
-    const cacheKey = `metrics:${storeId}:${from}:${to}`;
+    const cacheKey = `metrics:${channelId}:${from}:${to}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached) as StoreMetricsSummary;
 
@@ -426,7 +426,7 @@ export class MetricsService {
       .from(dailyStoreMetrics)
       .where(
         and(
-          eq(dailyStoreMetrics.storeId, storeId),
+          eq(dailyStoreMetrics.channelId, channelId),
           between(dailyStoreMetrics.date, from, to),
         ),
       )
@@ -452,7 +452,7 @@ export class MetricsService {
     const currency = days[0]?.currency ?? "USD";
     const totals = computeTotals(days);
     const summary: StoreMetricsSummary = {
-      storeId,
+      channelId,
       currency,
       from,
       to,
@@ -470,13 +470,13 @@ export class MetricsService {
 
   /** Ürün kârlılık sıralaması (net kâra göre azalan). */
   async getProductRanking(
-    orgId: string,
     storeId: string,
+    channelId: string,
     from: string,
     to: string,
     limit = 20,
   ): Promise<ProductProfitRow[]> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
 
     const rows = await this.db
       .select({
@@ -492,7 +492,7 @@ export class MetricsService {
       .from(productProfitDaily)
       .where(
         and(
-          eq(productProfitDaily.storeId, storeId),
+          eq(productProfitDaily.channelId, channelId),
           between(productProfitDaily.date, from, to),
         ),
       )
@@ -517,11 +517,11 @@ export class MetricsService {
    * (`metrics:{store}:*`) + org analitik agregaları (`analytics:{org}:*`).
    */
   private async invalidateStore(
-    storeId: string,
-    orgId?: string,
+    channelId: string,
+    storeId?: string,
   ): Promise<void> {
-    const patterns = [`metrics:${storeId}:*`];
-    if (orgId) patterns.push(`analytics:${orgId}:*`);
+    const patterns = [`metrics:${channelId}:*`];
+    if (storeId) patterns.push(`analytics:${storeId}:*`);
     for (const pattern of patterns) {
       let cursor = "0";
       do {

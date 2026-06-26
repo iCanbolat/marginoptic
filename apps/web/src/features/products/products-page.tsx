@@ -119,8 +119,7 @@ export function ProductsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Ürün Analizi</h1>
           <p className="text-sm text-muted-foreground">
-            Shopify, Amazon ve eBay ürünleri — ROAS, reklam harcaması ve dönüşüm
-            (Etsy hariç).
+            Shopify, Amazon ve eBay ürünleri — ROAS, reklam harcaması ve dönüşüm.
           </p>
         </div>
         <div className="flex items-center gap-2">

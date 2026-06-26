@@ -12,7 +12,7 @@ import {
 import { assertStoreInOrg } from "./store-access";
 
 export interface CogsResolveInput {
-  storeId: string;
+  channelId: string;
   sku?: string | null;
   variantExternalId?: string | null;
   productExternalId?: string | null;
@@ -22,7 +22,7 @@ export interface CogsResolveInput {
 }
 
 export interface ShippingResolveInput {
-  storeId: string;
+  channelId: string;
   country?: string | null;
   quantity: number;
   weightGrams?: number | null;
@@ -30,7 +30,7 @@ export interface ShippingResolveInput {
 }
 
 export interface PaymentFeeResolveInput {
-  storeId: string;
+  channelId: string;
   gateway?: string | null;
   amount: string;
   at?: Date;
@@ -50,8 +50,8 @@ export class CostResolverService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
   /** Mağaza org-sahipliğini doğrular (yoksa 404). */
-  assertStore(orgId: string, storeId: string): Promise<{ currency: string }> {
-    return assertStoreInOrg(this.db, orgId, storeId);
+  assertStore(storeId: string, channelId: string): Promise<{ currency: string }> {
+    return assertStoreInOrg(this.db, storeId, channelId);
   }
 
   /** Etkili tarih filtresi: from <= at <= to (null uçlar açık). */
@@ -69,7 +69,7 @@ export class CostResolverService {
   async resolveCogs(input: CogsResolveInput): Promise<CostResolution["cogs"]> {
     const at = input.at ?? new Date();
     const conds: SQL[] = [
-      eq(cogsRules.storeId, input.storeId),
+      eq(cogsRules.channelId, input.channelId),
       lte(cogsRules.minQty, input.quantity),
       ...this.effectiveAt(cogsRules.effectiveFrom, cogsRules.effectiveTo, at),
     ];
@@ -135,7 +135,7 @@ export class CostResolverService {
   ): Promise<CostResolution["shipping"]> {
     const at = input.at ?? new Date();
     const conds: SQL[] = [
-      eq(shippingCostRules.storeId, input.storeId),
+      eq(shippingCostRules.channelId, input.channelId),
       ...this.effectiveAt(
         shippingCostRules.effectiveFrom,
         shippingCostRules.effectiveTo,
@@ -198,7 +198,7 @@ export class CostResolverService {
   ): Promise<CostResolution["paymentFee"]> {
     const at = input.at ?? new Date();
     const conds: SQL[] = [
-      eq(paymentFeeRules.storeId, input.storeId),
+      eq(paymentFeeRules.channelId, input.channelId),
       ...this.effectiveAt(
         paymentFeeRules.effectiveFrom,
         paymentFeeRules.effectiveTo,
@@ -233,11 +233,11 @@ export class CostResolverService {
     return { fee: fee.toFixed(4), ruleId: best.id };
   }
 
-  async resolveTax(storeId: string): Promise<CostResolution["tax"]> {
+  async resolveTax(channelId: string): Promise<CostResolution["tax"]> {
     const [row] = await this.db
       .select()
       .from(taxConfig)
-      .where(eq(taxConfig.storeId, storeId))
+      .where(eq(taxConfig.channelId, channelId))
       .limit(1);
     return {
       salesTaxBorne: row?.salesTaxBorne ?? false,
@@ -247,7 +247,7 @@ export class CostResolverService {
 
   /** Tüm maliyet kalemlerini tek seferde çözer (debug endpoint + iç doğrulama). */
   async resolveAll(input: {
-    storeId: string;
+    channelId: string;
     sku?: string;
     variantExternalId?: string;
     productExternalId?: string;
@@ -263,13 +263,13 @@ export class CostResolverService {
       this.resolveShipping(input),
       input.amount != null
         ? this.resolvePaymentFee({
-            storeId: input.storeId,
+            channelId: input.channelId,
             gateway: input.gateway,
             amount: input.amount,
             at: input.at,
           })
         : Promise.resolve(null),
-      this.resolveTax(input.storeId),
+      this.resolveTax(input.channelId),
     ]);
     return { cogs, shipping, paymentFee, tax };
   }

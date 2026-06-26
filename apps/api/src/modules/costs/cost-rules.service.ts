@@ -23,7 +23,7 @@ type TaxRow = typeof taxConfig.$inferSelect;
 function toShipping(r: ShippingRow): ShippingRuleSummary {
   return {
     id: r.id,
-    storeId: r.storeId,
+    channelId: r.channelId,
     name: r.name,
     country: r.country,
     minQty: r.minQty,
@@ -42,7 +42,7 @@ function toShipping(r: ShippingRow): ShippingRuleSummary {
 function toPayment(r: PaymentRow): PaymentFeeRuleSummary {
   return {
     id: r.id,
-    storeId: r.storeId,
+    channelId: r.channelId,
     gateway: r.gateway,
     percentage: r.percentage,
     fixedFee: r.fixedFee,
@@ -55,7 +55,7 @@ function toPayment(r: PaymentRow): PaymentFeeRuleSummary {
 
 function toTax(r: TaxRow): TaxConfigSummary {
   return {
-    storeId: r.storeId,
+    channelId: r.channelId,
     salesTaxBorne: r.salesTaxBorne,
     incomeTaxRate: r.incomeTaxRate,
     updatedAt: r.updatedAt.toISOString(),
@@ -69,28 +69,28 @@ export class CostRulesService {
   // ---- Kargo kuralları ----
 
   async listShipping(
-    orgId: string,
     storeId: string,
+    channelId: string,
   ): Promise<ShippingRuleSummary[]> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const rows = await this.db
       .select()
       .from(shippingCostRules)
-      .where(eq(shippingCostRules.storeId, storeId))
+      .where(eq(shippingCostRules.channelId, channelId))
       .orderBy(shippingCostRules.createdAt);
     return rows.map(toShipping);
   }
 
   async createShipping(
-    orgId: string,
     storeId: string,
+    channelId: string,
     dto: ShippingRuleInput,
   ): Promise<ShippingRuleSummary> {
-    const store = await assertStoreInOrg(this.db, orgId, storeId);
+    const store = await assertStoreInOrg(this.db, storeId, channelId);
     const [row] = await this.db
       .insert(shippingCostRules)
       .values({
-        storeId,
+        channelId,
         name: dto.name,
         country: dto.country ?? null,
         minQty: dto.minQty ?? null,
@@ -109,14 +109,14 @@ export class CostRulesService {
 
   /** Toplu kargo kuralı ekleme: tek INSERT ifadesi (atomik). */
   async createManyShipping(
-    orgId: string,
     storeId: string,
+    channelId: string,
     dtos: ShippingRuleInput[],
   ): Promise<ShippingRuleSummary[]> {
-    const store = await assertStoreInOrg(this.db, orgId, storeId);
+    const store = await assertStoreInOrg(this.db, storeId, channelId);
     const values: (typeof shippingCostRules.$inferInsert)[] = dtos.map(
       (dto) => ({
-        storeId,
+        channelId,
         name: dto.name,
         country: dto.country ?? null,
         minQty: dto.minQty ?? null,
@@ -138,12 +138,12 @@ export class CostRulesService {
   }
 
   async updateShipping(
-    orgId: string,
     storeId: string,
+    channelId: string,
     id: string,
     dto: ShippingRuleInput,
   ): Promise<ShippingRuleSummary> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const [row] = await this.db
       .update(shippingCostRules)
       .set({
@@ -163,7 +163,7 @@ export class CostRulesService {
       .where(
         and(
           eq(shippingCostRules.id, id),
-          eq(shippingCostRules.storeId, storeId),
+          eq(shippingCostRules.channelId, channelId),
         ),
       )
       .returning();
@@ -172,17 +172,17 @@ export class CostRulesService {
   }
 
   async removeShipping(
-    orgId: string,
     storeId: string,
+    channelId: string,
     id: string,
   ): Promise<void> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const deleted = await this.db
       .delete(shippingCostRules)
       .where(
         and(
           eq(shippingCostRules.id, id),
-          eq(shippingCostRules.storeId, storeId),
+          eq(shippingCostRules.channelId, channelId),
         ),
       )
       .returning({ id: shippingCostRules.id });
@@ -194,28 +194,28 @@ export class CostRulesService {
   // ---- Ödeme ücreti kuralları ----
 
   async listPaymentFees(
-    orgId: string,
     storeId: string,
+    channelId: string,
   ): Promise<PaymentFeeRuleSummary[]> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const rows = await this.db
       .select()
       .from(paymentFeeRules)
-      .where(eq(paymentFeeRules.storeId, storeId))
+      .where(eq(paymentFeeRules.channelId, channelId))
       .orderBy(paymentFeeRules.createdAt);
     return rows.map(toPayment);
   }
 
   async createPaymentFee(
-    orgId: string,
     storeId: string,
+    channelId: string,
     dto: PaymentFeeRuleInput,
   ): Promise<PaymentFeeRuleSummary> {
-    const store = await assertStoreInOrg(this.db, orgId, storeId);
+    const store = await assertStoreInOrg(this.db, storeId, channelId);
     const [row] = await this.db
       .insert(paymentFeeRules)
       .values({
-        storeId,
+        channelId,
         gateway: dto.gateway ?? null,
         percentage: dto.percentage,
         fixedFee: dto.fixedFee,
@@ -228,12 +228,12 @@ export class CostRulesService {
   }
 
   async updatePaymentFee(
-    orgId: string,
     storeId: string,
+    channelId: string,
     id: string,
     dto: PaymentFeeRuleInput,
   ): Promise<PaymentFeeRuleSummary> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const [row] = await this.db
       .update(paymentFeeRules)
       .set({
@@ -246,7 +246,7 @@ export class CostRulesService {
         updatedAt: new Date(),
       })
       .where(
-        and(eq(paymentFeeRules.id, id), eq(paymentFeeRules.storeId, storeId)),
+        and(eq(paymentFeeRules.id, id), eq(paymentFeeRules.channelId, channelId)),
       )
       .returning();
     if (!row) throw new NotFoundException("Ödeme ücreti kuralı bulunamadı");
@@ -254,15 +254,15 @@ export class CostRulesService {
   }
 
   async removePaymentFee(
-    orgId: string,
     storeId: string,
+    channelId: string,
     id: string,
   ): Promise<void> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const deleted = await this.db
       .delete(paymentFeeRules)
       .where(
-        and(eq(paymentFeeRules.id, id), eq(paymentFeeRules.storeId, storeId)),
+        and(eq(paymentFeeRules.id, id), eq(paymentFeeRules.channelId, channelId)),
       )
       .returning({ id: paymentFeeRules.id });
     if (deleted.length === 0) {
@@ -273,19 +273,19 @@ export class CostRulesService {
   // ---- Vergi config (mağaza başına tek kayıt) ----
 
   async getTaxConfig(
-    orgId: string,
     storeId: string,
+    channelId: string,
   ): Promise<TaxConfigSummary> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const [row] = await this.db
       .select()
       .from(taxConfig)
-      .where(eq(taxConfig.storeId, storeId))
+      .where(eq(taxConfig.channelId, channelId))
       .limit(1);
     if (row) return toTax(row);
     // Varsayılan (henüz config yok).
     return {
-      storeId,
+      channelId,
       salesTaxBorne: false,
       incomeTaxRate: null,
       updatedAt: new Date(0).toISOString(),
@@ -293,22 +293,22 @@ export class CostRulesService {
   }
 
   async upsertTaxConfig(
-    orgId: string,
     storeId: string,
+    channelId: string,
     dto: TaxConfigInput,
   ): Promise<TaxConfigSummary> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const now = new Date();
     const [row] = await this.db
       .insert(taxConfig)
       .values({
-        storeId,
+        channelId,
         salesTaxBorne: dto.salesTaxBorne,
         incomeTaxRate: dto.incomeTaxRate ?? null,
         updatedAt: now,
       })
       .onConflictDoUpdate({
-        target: taxConfig.storeId,
+        target: taxConfig.channelId,
         set: {
           salesTaxBorne: dto.salesTaxBorne,
           incomeTaxRate: dto.incomeTaxRate ?? null,

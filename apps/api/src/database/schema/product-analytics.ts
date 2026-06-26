@@ -11,7 +11,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { adLevel } from "./ads";
-import { integrationProvider, stores } from "./stores";
+import { integrationProvider, channels } from "./channels";
 
 /** Para alanları için ortak tip (sales/costs/metrics/ads ile aynı): 20/4. */
 const money = (name: string) => numeric(name, { precision: 20, scale: 4 });
@@ -31,9 +31,9 @@ export const productAdLinks = pgTable(
   "product_ad_links",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     productExternalId: varchar("product_external_id", { length: 255 }).notNull(),
     provider: integrationProvider("provider").notNull(),
     adEntityExternalId: varchar("ad_entity_external_id", {
@@ -49,17 +49,17 @@ export const productAdLinks = pgTable(
   },
   (t) => [
     uniqueIndex("uq_product_ad_link").on(
-      t.storeId,
+      t.channelId,
       t.productExternalId,
       t.provider,
       t.adEntityExternalId,
     ),
     index("idx_product_ad_link_entity").on(
-      t.storeId,
+      t.channelId,
       t.provider,
       t.adEntityExternalId,
     ),
-    index("idx_product_ad_link_product").on(t.storeId, t.productExternalId),
+    index("idx_product_ad_link_product").on(t.channelId, t.productExternalId),
   ],
 );
 
@@ -68,9 +68,9 @@ export const productAdSpendDaily = pgTable(
   "product_ad_spend_daily",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     date: date("date").notNull(),
     productExternalId: varchar("product_external_id", { length: 255 }).notNull(),
     provider: integrationProvider("provider").notNull(),
@@ -86,12 +86,12 @@ export const productAdSpendDaily = pgTable(
   },
   (t) => [
     uniqueIndex("uq_product_ad_spend").on(
-      t.storeId,
+      t.channelId,
       t.provider,
       t.productExternalId,
       t.date,
     ),
-    index("idx_product_ad_spend_store_date").on(t.storeId, t.date),
+    index("idx_product_ad_spend_store_date").on(t.channelId, t.date),
   ],
 );
 
@@ -100,12 +100,12 @@ export const productTrafficDaily = pgTable(
   "product_traffic_daily",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    storeId: uuid("store_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => stores.id, { onDelete: "cascade" }),
+      .references(() => channels.id, { onDelete: "cascade" }),
     date: date("date").notNull(),
     productExternalId: varchar("product_external_id", { length: 255 }).notNull(),
-    // Kaynak satış kanalı (shopify/amazon/ebay) — Etsy yok.
+    // Kaynak satış kanalı (shopify/amazon/ebay)
     channel: varchar("channel", { length: 32 }).notNull(),
     sessions: integer("sessions").notNull().default(0),
     productViews: integer("product_views").notNull().default(0),
@@ -116,11 +116,11 @@ export const productTrafficDaily = pgTable(
   },
   (t) => [
     uniqueIndex("uq_product_traffic").on(
-      t.storeId,
+      t.channelId,
       t.channel,
       t.productExternalId,
       t.date,
     ),
-    index("idx_product_traffic_store_date").on(t.storeId, t.date),
+    index("idx_product_traffic_store_date").on(t.channelId, t.date),
   ],
 );

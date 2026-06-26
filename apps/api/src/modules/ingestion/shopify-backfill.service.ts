@@ -12,7 +12,7 @@ import { generateSynthetic } from "./shopify/synthetic";
 export type BackfillProgress = (processed: number, total: number) => Promise<void>;
 
 interface BackfillArgs {
-  storeId: string;
+  channelId: string;
   shop: string;
   accessToken: string;
   resource: ShopifySyncResource;
@@ -63,20 +63,20 @@ export class ShopifyBackfillService {
     switch (args.resource) {
       case "orders":
         for (const n of nodes) {
-          await this.ingestion.upsertOrder(args.storeId, normalizeOrder(n));
+          await this.ingestion.upsertOrder(args.channelId, normalizeOrder(n));
           await tick();
         }
         break;
       case "products":
         for (const n of nodes) {
-          await this.ingestion.upsertProduct(args.storeId, normalizeProduct(n));
+          await this.ingestion.upsertProduct(args.channelId, normalizeProduct(n));
           await tick();
         }
         break;
       case "customers":
         for (const n of nodes) {
           await this.ingestion.upsertCustomer(
-            args.storeId,
+            args.channelId,
             normalizeCustomer(n),
           );
           await tick();

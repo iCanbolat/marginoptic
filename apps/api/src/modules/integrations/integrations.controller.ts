@@ -21,14 +21,12 @@ import {
   adProviderSchema,
   amazonConnectSchema,
   ebayConnectSchema,
-  etsyConnectSchema,
   shopifyInstallSchema,
   type AdConnectInput,
   type AdInstallInput,
   type AdProvider,
   type AmazonConnectInput,
   type EbayConnectInput,
-  type EtsyConnectInput,
   type IntegrationsOverview,
   type ShopifyInstallInput,
   type ShopifyInstallResponse,
@@ -37,11 +35,10 @@ import {
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import {
-  type ActiveOrg,
-  CurrentOrg,
-} from "../auth/decorators/current-org.decorator";
+  type ActiveStore,
+  CurrentStore,
+} from "../auth/decorators/current-store.decorator";
 import { Public } from "../auth/decorators/public.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
 import { IntegrationsService } from "./integrations.service";
 
 @ApiTags("integrations")
@@ -51,14 +48,14 @@ export class IntegrationsController {
 
   @ApiBearerAuth()
   @Get()
-  overview(@CurrentOrg() org: ActiveOrg): Promise<IntegrationsOverview> {
+  overview(@CurrentStore() org: ActiveStore): Promise<IntegrationsOverview> {
     return this.integrations.overview(org.id);
   }
 
   /** Tüm sağlayıcılardan senkron cooldown durumu (tek-buton UI'ı için). */
   @ApiBearerAuth()
   @Get("sync-all")
-  syncAllStatus(@CurrentOrg() org: ActiveOrg): Promise<SyncAllStatus> {
+  syncAllStatus(@CurrentStore() org: ActiveStore): Promise<SyncAllStatus> {
     return this.integrations.syncAllStatus(org.id);
   }
 
@@ -66,15 +63,14 @@ export class IntegrationsController {
   @ApiBearerAuth()
   @HttpCode(200)
   @Post("sync-all")
-  syncAll(@CurrentOrg() org: ActiveOrg): Promise<SyncAllResult> {
+  syncAll(@CurrentStore() org: ActiveStore): Promise<SyncAllResult> {
     return this.integrations.syncAllForOrg(org.id);
   }
 
   @ApiBearerAuth()
-  @Roles("owner", "admin")
   @Get("shopify/install")
   async install(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Query(new ZodValidationPipe(shopifyInstallSchema)) query: ShopifyInstallInput,
   ): Promise<ShopifyInstallResponse> {
     return { url: await this.integrations.startShopifyInstall(org.id, query.shop) };
@@ -93,54 +89,20 @@ export class IntegrationsController {
 
   /** Dev-only: gerçek Shopify olmadan bağlantı simülasyonu. */
   @ApiBearerAuth()
-  @Roles("owner", "admin")
   @Post("shopify/dev-connect")
   devConnect(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Body(new ZodValidationPipe(shopifyInstallSchema)) dto: ShopifyInstallInput,
-  ): Promise<{ storeId: string; connectionId: string }> {
+  ): Promise<{ channelId: string; connectionId: string }> {
     return this.integrations.devConnectShopify(org.id, dto.shop);
-  }
-
-  // ---- Etsy (Faz 9) ----
-
-  @ApiBearerAuth()
-  @Roles("owner", "admin")
-  @Get("etsy/install")
-  async etsyInstall(
-    @CurrentOrg() org: ActiveOrg,
-  ): Promise<ShopifyInstallResponse> {
-    return { url: await this.integrations.startEtsyInstall(org.id) };
-  }
-
-  /** Etsy, kullanıcının tarayıcısını buraya yönlendirir (PKCE state ile). */
-  @Public()
-  @Get("etsy/callback")
-  async etsyCallback(
-    @Query() query: Record<string, string>,
-    @Res() res: Response,
-  ): Promise<void> {
-    res.redirect(await this.integrations.completeEtsyCallback(query));
-  }
-
-  /** Dev-only: gerçek Etsy olmadan bağlantı simülasyonu. */
-  @ApiBearerAuth()
-  @Roles("owner", "admin")
-  @Post("etsy/dev-connect")
-  etsyDevConnect(
-    @CurrentOrg() org: ActiveOrg,
-    @Body(new ZodValidationPipe(etsyConnectSchema)) dto: EtsyConnectInput,
-  ): Promise<{ storeId: string; connectionId: string }> {
-    return this.integrations.devConnectEtsy(org.id, dto.shop);
   }
 
   // ---- eBay (Faz 10) ----
 
   @ApiBearerAuth()
-  @Roles("owner", "admin")
   @Get("ebay/install")
   async ebayInstall(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
   ): Promise<ShopifyInstallResponse> {
     return { url: await this.integrations.startEbayInstall(org.id) };
   }
@@ -157,22 +119,20 @@ export class IntegrationsController {
 
   /** Dev-only: gerçek eBay olmadan bağlantı simülasyonu. */
   @ApiBearerAuth()
-  @Roles("owner", "admin")
   @Post("ebay/dev-connect")
   ebayDevConnect(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Body(new ZodValidationPipe(ebayConnectSchema)) dto: EbayConnectInput,
-  ): Promise<{ storeId: string; connectionId: string }> {
+  ): Promise<{ channelId: string; connectionId: string }> {
     return this.integrations.devConnectEbay(org.id, dto.shop);
   }
 
   // ---- Amazon (Faz 10) ----
 
   @ApiBearerAuth()
-  @Roles("owner", "admin")
   @Get("amazon/install")
   async amazonInstall(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
   ): Promise<ShopifyInstallResponse> {
     return { url: await this.integrations.startAmazonInstall(org.id) };
   }
@@ -189,12 +149,11 @@ export class IntegrationsController {
 
   /** Dev-only: gerçek Amazon olmadan bağlantı simülasyonu. */
   @ApiBearerAuth()
-  @Roles("owner", "admin")
   @Post("amazon/dev-connect")
   amazonDevConnect(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Body(new ZodValidationPipe(amazonConnectSchema)) dto: AmazonConnectInput,
-  ): Promise<{ storeId: string; connectionId: string }> {
+  ): Promise<{ channelId: string; connectionId: string }> {
     return this.integrations.devConnectAmazon(org.id, dto.shop);
   }
 
@@ -223,10 +182,9 @@ export class IntegrationsController {
 
   /** Reklam OAuth başlat: authorize URL döndür. */
   @ApiBearerAuth()
-  @Roles("owner", "admin")
   @Get("ads/:provider/install")
   async adInstall(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("provider", new ZodValidationPipe(adProviderSchema))
     provider: AdProvider,
     @Query(new ZodValidationPipe(adInstallSchema)) query: AdInstallInput,
@@ -235,7 +193,7 @@ export class IntegrationsController {
       url: await this.integrations.startAdInstall(
         org.id,
         provider,
-        query.storeId,
+        query.channelId,
       ),
     };
   }
@@ -254,10 +212,9 @@ export class IntegrationsController {
 
   /** Dev-only: gerçek reklam OAuth'u olmadan bağlantı simülasyonu. */
   @ApiBearerAuth()
-  @Roles("owner", "admin")
   @Post("ads/:provider/dev-connect")
   adDevConnect(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("provider", new ZodValidationPipe(adProviderSchema))
     provider: AdProvider,
     @Body(new ZodValidationPipe(adConnectSchema)) dto: AdConnectInput,
@@ -265,17 +222,16 @@ export class IntegrationsController {
     return this.integrations.devConnectAd(
       org.id,
       provider,
-      dto.storeId,
+      dto.channelId,
       dto.externalAccountId,
     );
   }
 
   @ApiBearerAuth()
   @Delete(":connectionId")
-  @Roles("owner", "admin")
   @HttpCode(204)
   disconnect(
-    @CurrentOrg() org: ActiveOrg,
+    @CurrentStore() org: ActiveStore,
     @Param("connectionId") connectionId: string,
   ): Promise<void> {
     return this.integrations.disconnect(org.id, connectionId);

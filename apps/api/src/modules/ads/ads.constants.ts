@@ -19,7 +19,7 @@ export const ADS_INCREMENTAL_DAYS = 3;
  */
 export interface AdsSyncJob {
   connectionId?: string;
-  storeId?: string;
+  channelId?: string;
   provider?: AdProvider;
   externalAccountId?: string;
   since?: string; // YYYY-MM-DD

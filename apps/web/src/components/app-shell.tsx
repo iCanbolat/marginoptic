@@ -8,7 +8,7 @@ import {
   Coins01Icon,
   Megaphone01Icon,
   PlugSocketIcon,
-  UserMultiple02Icon,
+  Store01Icon,
   Key01Icon,
   CreditCardIcon,
   SidebarLeft01Icon,
@@ -20,7 +20,7 @@ import { authApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSidebar } from "@/lib/stores/sidebar";
 import { cn } from "@/lib/utils";
-import { OrgSwitcher } from "./org-switcher";
+import { StoreSwitcher } from "./store-switcher";
 import { DataFreshnessBadge } from "./data-freshness-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Yönetim",
     items: [
       { to: "/integrations", label: "Entegrasyonlar", icon: PlugSocketIcon },
-      { to: "/settings/members", label: "Üyeler", icon: UserMultiple02Icon },
+      { to: "/settings/stores", label: "Mağazalar", icon: Store01Icon },
       { to: "/settings/api-keys", label: "API Anahtarları", icon: Key01Icon },
       { to: "/billing", label: "Faturalandırma", icon: CreditCardIcon },
     ],
@@ -150,16 +150,16 @@ function MobileNav() {
 export function AppShell() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const setOrganizations = useAuthStore((s) => s.setOrganizations);
+  const setStores = useAuthStore((s) => s.setStores);
   const collapsed = useSidebar((s) => s.collapsed);
   const toggleSidebar = useSidebar((s) => s.toggle);
 
-  // Organizasyon listesini + kullanıcıyı tazele (switcher bunu kullanır).
+  // Mağaza listesini + kullanıcıyı tazele (switcher bunu kullanır).
   useQuery({
     queryKey: ["me"],
     queryFn: async () => {
       const me = await authApi.me();
-      setOrganizations(me.organizations);
+      setStores(me.stores);
       return me;
     },
   });
@@ -192,12 +192,10 @@ export function AppShell() {
             collapsed && "justify-center px-0",
           )}
         >
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-            C
-          </div>
+          <img src="/app-icon.svg" alt="MarginOptic" className="size-8 shrink-0 rounded-md" />
           {!collapsed && (
             <span className="text-lg font-semibold tracking-tight">
-              Churnify
+              MarginOptic
             </span>
           )}
         </div>
@@ -239,7 +237,7 @@ export function AppShell() {
         <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
           <div className="flex min-w-0 items-center gap-2">
             <MobileNav />
-            <OrgSwitcher />
+            <StoreSwitcher />
             <DataFreshnessBadge />
           </div>
           <DropdownMenu>

@@ -11,12 +11,12 @@ export const FX_RATES_SCHEDULER = "fx-rates-daily";
 
 /**
  * Rollup job verisi.
- * - `storeId` dolu + `from`/`to` yok → o mağazayı tam yeniden hesapla (sync sonrası).
- * - `storeId` + `from`/`to` → yalnız o aralığı yeniden hesapla (webhook artımlı).
+ * - `channelId` dolu + `from`/`to` yok → o mağazayı tam yeniden hesapla (sync sonrası).
+ * - `channelId` + `from`/`to` → yalnız o aralığı yeniden hesapla (webhook artımlı).
  * - Boş → gece scheduler: tüm aktif mağazaları tam yeniden hesapla.
  */
 export interface MetricsRollupJob {
-  storeId?: string;
+  channelId?: string;
   from?: string; // YYYY-MM-DD
   to?: string; // YYYY-MM-DD
 }

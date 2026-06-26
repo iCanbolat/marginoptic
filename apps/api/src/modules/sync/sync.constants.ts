@@ -1,5 +1,4 @@
 export const QUEUE_SHOPIFY_SYNC = "shopify-sync";
-export const QUEUE_ETSY_SYNC = "etsy-sync";
 export const QUEUE_EBAY_SYNC = "ebay-sync";
 export const QUEUE_AMAZON_SYNC = "amazon-sync";
 export const QUEUE_WEBHOOKS = "webhooks";
@@ -19,25 +18,13 @@ export const SHOPIFY_SYNC_RESOURCES = [
 ] as const;
 export type ShopifySyncResource = (typeof SHOPIFY_SYNC_RESOURCES)[number];
 
-/** Etsy kaynakları aynı isimlerle eşlenir (listings→products, receipts→orders, buyers→customers). */
-export const ETSY_SYNC_RESOURCES = SHOPIFY_SYNC_RESOURCES;
-export type EtsySyncResource = ShopifySyncResource;
-
-export interface EtsySyncJob {
-  connectionId: string;
-  storeId: string;
-  /** Etsy mağaza kimliği (canlı fetch için); dev'de mağaza adı. */
-  shopId: string;
-  resource: EtsySyncResource;
-}
-
 /** eBay kaynakları aynı isimlerle eşlenir (inventory→products, orders→orders, buyers→customers). */
 export const EBAY_SYNC_RESOURCES = SHOPIFY_SYNC_RESOURCES;
 export type EbaySyncResource = ShopifySyncResource;
 
 export interface EbaySyncJob {
   connectionId: string;
-  storeId: string;
+  channelId: string;
   /** eBay satıcı kimliği (canlı fetch için); dev'de mağaza adı. */
   shopId: string;
   resource: EbaySyncResource;
@@ -51,7 +38,7 @@ export type AmazonSyncResource = ShopifySyncResource;
 
 export interface AmazonSyncJob {
   connectionId: string;
-  storeId: string;
+  channelId: string;
   /** Amazon marketplace/satıcı kimliği (canlı fetch için); dev'de satıcı adı. */
   shopId: string;
   resource: AmazonSyncResource;
@@ -68,7 +55,7 @@ export type SyncStatusValue =
 
 export interface ShopifySyncJob {
   connectionId: string;
-  storeId: string;
+  channelId: string;
   shop: string;
   resource: ShopifySyncResource;
 }

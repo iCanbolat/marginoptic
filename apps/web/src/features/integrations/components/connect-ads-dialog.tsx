@@ -34,7 +34,7 @@ export function ConnectAdsDialog({
 }: ConnectAdsDialogProps) {
   const { data: stores = [] } = useStores();
   const { install, devConnect } = useConnectAds();
-  const [storeId, setStoreId] = useState("");
+  const [channelId, setStoreId] = useState("");
   const [account, setAccount] = useState("");
 
   // Dialog her açıldığında (sağlayıcı değişince) formu sıfırla.
@@ -44,7 +44,7 @@ export function ConnectAdsDialog({
   }, [provider]);
 
   const label = provider ? AD_LABELS[provider] : "";
-  const ready = provider !== null && storeId !== "";
+  const ready = provider !== null && channelId !== "";
 
   return (
     <Dialog open={provider !== null} onOpenChange={onOpenChange}>
@@ -65,7 +65,7 @@ export function ConnectAdsDialog({
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Mağaza</Label>
-              <Select value={storeId} onValueChange={setStoreId}>
+              <Select value={channelId} onValueChange={setStoreId}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Mağaza seç" />
                 </SelectTrigger>
@@ -100,7 +100,7 @@ export function ConnectAdsDialog({
                     devConnect.mutate(
                       {
                         provider,
-                        storeId,
+                        channelId,
                         externalAccountId: account || "act_demo",
                       },
                       { onSuccess: () => onOpenChange(false) },
@@ -114,7 +114,7 @@ export function ConnectAdsDialog({
                 type="button"
                 disabled={!ready || install.isPending}
                 onClick={() =>
-                  provider && install.mutate({ provider, storeId })
+                  provider && install.mutate({ provider, channelId })
                 }
               >
                 Bağla

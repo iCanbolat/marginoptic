@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowReloadHorizontalIcon } from "@hugeicons/core-free-icons";
-import { ingestionApi, storesApi } from "@/lib/api";
+import { ingestionApi, channelsApi } from "@/lib/api";
 import { useStoreSelection } from "@/lib/stores/selection";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ export function DataFreshnessBadge() {
   const activeStoreId = useStoreSelection((s) => s.activeStoreId);
   const { data: stores = [] } = useQuery({
     queryKey: ["stores"],
-    queryFn: storesApi.list,
+    queryFn: channelsApi.list,
   });
 
   const storeId = activeStoreId ?? stores[0]?.id ?? null;

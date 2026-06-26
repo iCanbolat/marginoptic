@@ -23,7 +23,7 @@ type CogsRow = typeof cogsRules.$inferSelect;
 function toSummary(r: CogsRow): CogsRuleSummary {
   return {
     id: r.id,
-    storeId: r.storeId,
+    channelId: r.channelId,
     scope: r.scope,
     matchValue: r.matchValue,
     country: r.country,
@@ -52,26 +52,26 @@ function ruleKey(
 export class CogsService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
-  async list(orgId: string, storeId: string): Promise<CogsRuleSummary[]> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+  async list(storeId: string, channelId: string): Promise<CogsRuleSummary[]> {
+    await assertStoreInOrg(this.db, storeId, channelId);
     const rows = await this.db
       .select()
       .from(cogsRules)
-      .where(eq(cogsRules.storeId, storeId))
+      .where(eq(cogsRules.channelId, channelId))
       .orderBy(cogsRules.scope, cogsRules.matchValue);
     return rows.map(toSummary);
   }
 
   async create(
-    orgId: string,
     storeId: string,
+    channelId: string,
     dto: CogsRuleInput,
   ): Promise<CogsRuleSummary> {
-    const store = await assertStoreInOrg(this.db, orgId, storeId);
+    const store = await assertStoreInOrg(this.db, storeId, channelId);
     const [row] = await this.db
       .insert(cogsRules)
       .values({
-        storeId,
+        channelId,
         scope: dto.scope,
         matchValue: dto.scope === "global" ? null : (dto.matchValue ?? null),
         country: dto.country ?? null,
@@ -89,13 +89,13 @@ export class CogsService {
 
   /** Toplu ekleme: tek INSERT ifadesi (atomik). */
   async createMany(
-    orgId: string,
     storeId: string,
+    channelId: string,
     dtos: CogsRuleInput[],
   ): Promise<CogsRuleSummary[]> {
-    const store = await assertStoreInOrg(this.db, orgId, storeId);
+    const store = await assertStoreInOrg(this.db, storeId, channelId);
     const values: (typeof cogsRules.$inferInsert)[] = dtos.map((dto) => ({
-      storeId,
+      channelId,
       scope: dto.scope,
       matchValue: dto.scope === "global" ? null : (dto.matchValue ?? null),
       country: dto.country ?? null,
@@ -112,12 +112,12 @@ export class CogsService {
   }
 
   async update(
-    orgId: string,
     storeId: string,
+    channelId: string,
     id: string,
     dto: CogsRuleUpdate,
   ): Promise<CogsRuleSummary> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const set: Partial<typeof cogsRules.$inferInsert> = { updatedAt: new Date() };
     if ("matchValue" in dto) set.matchValue = dto.matchValue ?? null;
     if ("country" in dto) set.country = dto.country ?? null;
@@ -135,17 +135,17 @@ export class CogsService {
     const [row] = await this.db
       .update(cogsRules)
       .set(set)
-      .where(and(eq(cogsRules.id, id), eq(cogsRules.storeId, storeId)))
+      .where(and(eq(cogsRules.id, id), eq(cogsRules.channelId, channelId)))
       .returning();
     if (!row) throw new NotFoundException("COGS kuralı bulunamadı");
     return toSummary(row);
   }
 
-  async remove(orgId: string, storeId: string, id: string): Promise<void> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+  async remove(storeId: string, channelId: string, id: string): Promise<void> {
+    await assertStoreInOrg(this.db, storeId, channelId);
     const deleted = await this.db
       .delete(cogsRules)
-      .where(and(eq(cogsRules.id, id), eq(cogsRules.storeId, storeId)))
+      .where(and(eq(cogsRules.id, id), eq(cogsRules.channelId, channelId)))
       .returning({ id: cogsRules.id });
     if (deleted.length === 0) {
       throw new NotFoundException("COGS kuralı bulunamadı");
@@ -154,11 +154,11 @@ export class CogsService {
 
   /** Toplu COGS CSV içe-aktarımı (dryRun=true → yalnız önizleme/doğrulama). */
   async importCsv(
-    orgId: string,
     storeId: string,
+    channelId: string,
     dto: CogsCsvImportInput,
   ): Promise<CogsCsvImportResult> {
-    const store = await assertStoreInOrg(this.db, orgId, storeId);
+    const store = await assertStoreInOrg(this.db, storeId, channelId);
     const { rows, headerError } = parseCogsCsv(dto.csv);
     if (headerError) throw new BadRequestException(headerError);
 
@@ -185,7 +185,7 @@ export class CogsService {
           })
           .from(cogsRules)
           .where(
-            and(eq(cogsRules.storeId, storeId), eq(cogsRules.scope, "sku")),
+            and(eq(cogsRules.channelId, channelId), eq(cogsRules.scope, "sku")),
           );
         const byKey = new Map(
           existing.map((r) => [
@@ -212,7 +212,7 @@ export class CogsService {
               .where(eq(cogsRules.id, existingId));
           } else {
             toInsert.push({
-              storeId,
+              channelId,
               scope: "sku",
               matchValue: row.sku,
               country: row.country,

@@ -3,7 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { FlowProducer, Queue, type JobsOptions } from "bullmq";
 import { eq } from "drizzle-orm";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
-import { syncState } from "../../database/schema/stores";
+import { syncState } from "../../database/schema/channels";
 import {
   METRICS_FLOW_PRODUCER,
   QUEUE_METRICS_ROLLUP,
@@ -12,16 +12,13 @@ import {
 import {
   AMAZON_SYNC_RESOURCES,
   EBAY_SYNC_RESOURCES,
-  ETSY_SYNC_RESOURCES,
   QUEUE_AMAZON_SYNC,
   QUEUE_EBAY_SYNC,
-  QUEUE_ETSY_SYNC,
   QUEUE_SHOPIFY_SYNC,
   QUEUE_WEBHOOKS,
   SHOPIFY_SYNC_RESOURCES,
   type AmazonSyncJob,
   type EbaySyncJob,
-  type EtsySyncJob,
   type ShopifySyncJob,
   type SyncStatusValue,
   type WebhookJob,
@@ -57,7 +54,7 @@ export class SyncService {
    */
   async enqueueShopifyBackfill(args: {
     connectionId: string;
-    storeId: string;
+    channelId: string;
     shop: string;
   }): Promise<void> {
     for (const resource of SHOPIFY_SYNC_RESOURCES) {
@@ -66,7 +63,7 @@ export class SyncService {
     await this.flow.add({
       name: "rollup-after-backfill",
       queueName: QUEUE_METRICS_ROLLUP,
-      data: { storeId: args.storeId } satisfies MetricsRollupJob,
+      data: { channelId: args.channelId } satisfies MetricsRollupJob,
       opts: FLOW_JOB_OPTS,
       children: SHOPIFY_SYNC_RESOURCES.map((resource) => ({
         name: `backfill:${resource}`,
@@ -78,39 +75,13 @@ export class SyncService {
   }
 
   /**
-   * Etsy ilk tam içe-aktarımı (listings/receipts/buyers) + sonrasına metrics-rollup
-   * zinciri (Shopify ile aynı FlowProducer deseni).
-   */
-  async enqueueEtsyBackfill(args: {
-    connectionId: string;
-    storeId: string;
-    shopId: string;
-  }): Promise<void> {
-    for (const resource of ETSY_SYNC_RESOURCES) {
-      await this.setSyncState(args.connectionId, resource, "queued");
-    }
-    await this.flow.add({
-      name: "rollup-after-etsy-backfill",
-      queueName: QUEUE_METRICS_ROLLUP,
-      data: { storeId: args.storeId } satisfies MetricsRollupJob,
-      opts: FLOW_JOB_OPTS,
-      children: ETSY_SYNC_RESOURCES.map((resource) => ({
-        name: `etsy-backfill:${resource}`,
-        queueName: QUEUE_ETSY_SYNC,
-        data: { ...args, resource } satisfies EtsySyncJob,
-        opts: FLOW_JOB_OPTS,
-      })),
-    });
-  }
-
-  /**
    * eBay ilk tam içe-aktarımı veya polling artımlı senkronu (inventory/orders/buyers) +
-   * sonrasına metrics-rollup zinciri (Etsy ile aynı FlowProducer deseni). `since` verilirse
+   * sonrasına metrics-rollup zinciri (Shopify ile aynı FlowProducer deseni). `since` verilirse
    * orders artımlı çekilir (polling watermark).
    */
   async enqueueEbayBackfill(args: {
     connectionId: string;
-    storeId: string;
+    channelId: string;
     shopId: string;
     since?: string;
   }): Promise<void> {
@@ -120,7 +91,7 @@ export class SyncService {
     await this.flow.add({
       name: "rollup-after-ebay-backfill",
       queueName: QUEUE_METRICS_ROLLUP,
-      data: { storeId: args.storeId } satisfies MetricsRollupJob,
+      data: { channelId: args.channelId } satisfies MetricsRollupJob,
       opts: FLOW_JOB_OPTS,
       children: EBAY_SYNC_RESOURCES.map((resource) => ({
         name: `ebay-backfill:${resource}`,
@@ -138,7 +109,7 @@ export class SyncService {
    */
   async enqueueAmazonBackfill(args: {
     connectionId: string;
-    storeId: string;
+    channelId: string;
     shopId: string;
     since?: string;
   }): Promise<void> {
@@ -148,7 +119,7 @@ export class SyncService {
     await this.flow.add({
       name: "rollup-after-amazon-backfill",
       queueName: QUEUE_METRICS_ROLLUP,
-      data: { storeId: args.storeId } satisfies MetricsRollupJob,
+      data: { channelId: args.channelId } satisfies MetricsRollupJob,
       opts: FLOW_JOB_OPTS,
       children: AMAZON_SYNC_RESOURCES.map((resource) => ({
         name: `amazon-backfill:${resource}`,
@@ -160,14 +131,14 @@ export class SyncService {
   }
 
   /** Webhook artımlı: belirli mağaza/gün(ler) için rollup'ı kuyruğa alır. */
-  async enqueueMetricsRollup(storeId: string, range?: {
+  async enqueueMetricsRollup(channelId: string, range?: {
     from: string;
     to: string;
   }): Promise<void> {
     await this.flow.add({
       name: "rollup-incremental",
       queueName: QUEUE_METRICS_ROLLUP,
-      data: { storeId, ...range } satisfies MetricsRollupJob,
+      data: { channelId, ...range } satisfies MetricsRollupJob,
       opts: FLOW_JOB_OPTS,
     });
   }

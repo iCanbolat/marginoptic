@@ -66,7 +66,7 @@ export function ExpenseForm({
       type: "recurring",
       recurrence: "monthly",
       allocation: "store",
-      storeId: activeStoreId ?? undefined,
+      channelId: activeStoreId ?? undefined,
       amount: "",
       currency: "USD",
       startDate: todayIso(),
@@ -79,10 +79,10 @@ export function ExpenseForm({
   const allocation = watch("allocation");
   const missingStore = allocation === "store" && !activeStoreId;
 
-  // storeId, dağıtım + aktif mağaza seçiminden türetilir (gizli alan).
+  // channelId, dağıtım + aktif mağaza seçiminden türetilir (gizli alan).
   useEffect(() => {
     setValue(
-      "storeId",
+      "channelId",
       allocation === "store" ? (activeStoreId ?? undefined) : undefined,
       { shouldValidate: true },
     );
@@ -195,7 +195,7 @@ export function ExpenseForm({
             {missingStore ? (
               <p className="text-xs text-destructive">Mağaza seçili değil</p>
             ) : (
-              <FieldError message={errors.storeId?.message} />
+              <FieldError message={errors.channelId?.message} />
             )}
           </div>
           <div className="space-y-1">

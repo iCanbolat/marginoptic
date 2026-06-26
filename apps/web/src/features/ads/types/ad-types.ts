@@ -9,7 +9,7 @@ export type {
   AdPerformanceRow,
   AdDailyPoint,
   AdsPerformanceResponse,
-  StoreSummary,
+  ChannelSummary,
 } from "@churnify/shared";
 
 import type { AdLevel } from "@churnify/shared";

@@ -13,7 +13,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import type { WidgetConfig, WidgetType } from "@churnify/shared";
-import { organizations, users } from "./auth";
+import { stores, users } from "./auth";
 
 /**
  * Faz 7 — Pano özelleştirme.
@@ -42,9 +42,9 @@ export const dashboards = pgTable(
   "dashboards",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
+    storeId: uuid("store_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => stores.id, { onDelete: "cascade" }),
     createdBy: uuid("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -58,9 +58,9 @@ export const dashboards = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("idx_dashboard_org").on(t.organizationId),
+    index("idx_dashboard_org").on(t.storeId),
     uniqueIndex("uq_dashboard_default")
-      .on(t.organizationId)
+      .on(t.storeId)
       .where(sql`${t.isDefault}`),
   ],
 );
@@ -97,9 +97,9 @@ export const customMetrics = pgTable(
   "custom_metrics",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
+    storeId: uuid("store_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => stores.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 120 }).notNull(),
     formula: text("formula").notNull(),
     format: customMetricFormat("format").notNull().default("number"),
@@ -111,7 +111,7 @@ export const customMetrics = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("uq_custom_metric_org_name").on(t.organizationId, t.name),
-    index("idx_custom_metric_org").on(t.organizationId),
+    uniqueIndex("uq_custom_metric_org_name").on(t.storeId, t.name),
+    index("idx_custom_metric_org").on(t.storeId),
   ],
 );

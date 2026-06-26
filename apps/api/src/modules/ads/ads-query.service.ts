@@ -25,17 +25,17 @@ export class AdsQueryService {
 
   /** Tek mağaza (Faz 6, store-scoped uç). */
   async getPerformance(
-    orgId: string,
     storeId: string,
+    channelId: string,
     from: string,
     to: string,
     level: AdLevel,
   ): Promise<AdsPerformanceResponse> {
-    const store = await assertStoreInOrg(this.db, orgId, storeId);
+    const store = await assertStoreInOrg(this.db, storeId, channelId);
     return this.performance(
-      eq(adSpend.storeId, storeId),
-      eq(dailyStoreMetrics.storeId, storeId),
-      storeId,
+      eq(adSpend.channelId, channelId),
+      eq(dailyStoreMetrics.channelId, channelId),
+      channelId,
       store.currency,
       from,
       to,
@@ -45,7 +45,7 @@ export class AdsQueryService {
 
   /**
    * Org genelinde çok-mağaza (Faz 7, analytics). `storeIds` çağıran tarafından
-   * org'a göre doğrulanır; `response.storeId = "*"`.
+   * org'a göre doğrulanır; `response.channelId = "*"`.
    */
   async getOrgPerformance(
     storeIds: string[],
@@ -56,7 +56,7 @@ export class AdsQueryService {
   ): Promise<AdsPerformanceResponse> {
     if (storeIds.length === 0) {
       return {
-        storeId: "*",
+        channelId: "*",
         from,
         to,
         level,
@@ -67,8 +67,8 @@ export class AdsQueryService {
       };
     }
     return this.performance(
-      inArray(adSpend.storeId, storeIds),
-      inArray(dailyStoreMetrics.storeId, storeIds),
+      inArray(adSpend.channelId, storeIds),
+      inArray(dailyStoreMetrics.channelId, storeIds),
       "*",
       currency,
       from,
@@ -81,7 +81,7 @@ export class AdsQueryService {
   private async performance(
     adStoreCond: SQL,
     metricStoreCond: SQL,
-    storeId: string,
+    channelId: string,
     currency: string,
     from: string,
     to: string,
@@ -177,7 +177,7 @@ export class AdsQueryService {
       poas: ratio(num(metrics?.netProfit), spend),
     };
 
-    return { storeId, from, to, level, currency, summary, rows: breakdown, daily };
+    return { channelId, from, to, level, currency, summary, rows: breakdown, daily };
   }
 }
 

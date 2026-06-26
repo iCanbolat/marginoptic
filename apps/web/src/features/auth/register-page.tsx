@@ -61,8 +61,8 @@ export function RegisterPage() {
           ) : null}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="organizationName">Organizasyon adı (opsiyonel)</Label>
-          <Input id="organizationName" {...register("organizationName")} />
+          <Label htmlFor="storeName">Mağaza adı (opsiyonel)</Label>
+          <Input id="storeName" {...register("storeName")} />
         </div>
         {serverError ? (
           <p className="text-sm text-destructive">{serverError}</p>

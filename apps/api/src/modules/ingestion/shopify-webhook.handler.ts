@@ -3,8 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
 import {
   integrationConnections,
-  stores,
-} from "../../database/schema/stores";
+  channels,
+} from "../../database/schema/channels";
 import { products } from "../../database/schema/sales";
 import { GdprService } from "./gdpr.service";
 import { IngestionService } from "./ingestion.service";
@@ -19,7 +19,7 @@ type Json = Record<string, unknown>;
 
 /** Net kâr metriklerini etkileyen webhook'un artımlı rollup hedefi. */
 export interface WebhookEffect {
-  storeId: string;
+  channelId: string;
   /** Etkilenen iş günleri (YYYY-MM-DD) — bu günlerin rollup'ı yeniden çalışmalı. */
   dates: string[];
 }
@@ -68,8 +68,8 @@ export class ShopifyWebhookHandler {
         return null;
     }
 
-    const storeId = await this.storeIdForShop(shop);
-    if (!storeId) {
+    const channelId = await this.storeIdForShop(shop);
+    if (!channelId) {
       this.logger.warn(`Webhook için mağaza bulunamadı: ${shop} (${topic})`);
       return null;
     }
@@ -79,33 +79,33 @@ export class ShopifyWebhookHandler {
       case "orders/updated":
       case "orders/cancelled": {
         const order = normalizeOrder(body);
-        await this.ingestion.upsertOrder(storeId, order);
+        await this.ingestion.upsertOrder(channelId, order);
         return {
-          storeId,
+          channelId,
           dates: [utcDate(order.processedAt ?? order.shopifyCreatedAt)],
         };
       }
       case "refunds/create": {
         const refund = normalizeRefund(body);
         const written = await this.ingestion.upsertRefund(
-          storeId,
+          channelId,
           extractId(body.order_id) || null,
           refund,
         );
         return written
-          ? { storeId, dates: [utcDate(refund.processedAt)] }
+          ? { channelId, dates: [utcDate(refund.processedAt)] }
           : null;
       }
       case "products/create":
       case "products/update":
-        await this.ingestion.upsertProduct(storeId, normalizeProduct(body));
+        await this.ingestion.upsertProduct(channelId, normalizeProduct(body));
         return null;
       case "products/delete":
         await this.db
           .delete(products)
           .where(
             and(
-              eq(products.storeId, storeId),
+              eq(products.channelId, channelId),
               eq(products.externalId, extractId(body.id)),
             ),
           );
@@ -118,10 +118,10 @@ export class ShopifyWebhookHandler {
 
   private async storeIdForShop(shop: string): Promise<string | null> {
     const [row] = await this.db
-      .select({ id: stores.id })
-      .from(stores)
+      .select({ id: channels.id })
+      .from(channels)
       .where(
-        and(eq(stores.channel, "shopify"), eq(stores.externalShopId, shop)),
+        and(eq(channels.channel, "shopify"), eq(channels.externalShopId, shop)),
       )
       .limit(1);
     return row?.id ?? null;
@@ -129,12 +129,12 @@ export class ShopifyWebhookHandler {
 
   private async markUninstalled(shop: string): Promise<void> {
     const [store] = await this.db
-      .update(stores)
+      .update(channels)
       .set({ status: "disconnected", updatedAt: new Date() })
       .where(
-        and(eq(stores.channel, "shopify"), eq(stores.externalShopId, shop)),
+        and(eq(channels.channel, "shopify"), eq(channels.externalShopId, shop)),
       )
-      .returning({ id: stores.id });
+      .returning({ id: channels.id });
     if (store) {
       await this.db
         .update(integrationConnections)
@@ -144,7 +144,7 @@ export class ShopifyWebhookHandler {
           refreshTokenEnc: null,
           updatedAt: new Date(),
         })
-        .where(eq(integrationConnections.storeId, store.id));
+        .where(eq(integrationConnections.channelId, store.id));
     }
     this.logger.log(`Uygulama kaldırıldı: ${shop}`);
   }

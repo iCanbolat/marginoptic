@@ -38,9 +38,11 @@ export function AuthLayout({
 
       <Card className="relative z-10 w-full max-w-sm border-border/60 bg-card/80 shadow-xl backdrop-blur-xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground">
-            C
-          </div>
+          <img
+            src="/horizontal-lockup-light.svg"
+            alt="MarginOptic"
+            className="mx-auto mb-3 h-12 w-auto"
+          />
           <CardTitle>{title}</CardTitle>
           <CardDescription>{subtitle}</CardDescription>
         </CardHeader>

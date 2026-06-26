@@ -5,7 +5,7 @@ import type { PixelEventInput, StoreTrackingInfo } from "@churnify/shared";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
 import { productProfitDaily } from "../../database/schema/metrics";
 import { productTrafficDaily } from "../../database/schema/product-analytics";
-import { stores } from "../../database/schema/stores";
+import { channels } from "../../database/schema/channels";
 import { assertStoreInOrg } from "../costs/store-access";
 import { TRAFFIC_WINDOW_DAYS } from "./tracking.constants";
 
@@ -38,7 +38,7 @@ function hash(s: string): number {
 /**
  * Storefront dönüşüm izleme: Shopify snippet beacon'u + Amazon/eBay traffic.
  * `product_traffic_daily` (sessions/productViews/purchases) yazar; conversion
- * rate = purchases / sessions okuma katmanında türetilir. Etsy izlenmez.
+ * rate = purchases / sessions okuma katmanında türetilir
  */
 @Injectable()
 export class ProductTrafficService {
@@ -55,9 +55,9 @@ export class ProductTrafficService {
    */
   async recordPixelEvent(payload: PixelEventInput): Promise<void> {
     const [store] = await this.db
-      .select({ id: stores.id, channel: stores.channel })
-      .from(stores)
-      .where(eq(stores.trackingKey, payload.accountId))
+      .select({ id: channels.id, channel: channels.channel })
+      .from(channels)
+      .where(eq(channels.trackingKey, payload.accountId))
       .limit(1);
     if (!store) return; // bilinmeyen Account ID → yok say
 
@@ -68,7 +68,7 @@ export class ProductTrafficService {
       const pid = gidToExternalId(data.productId);
       if (!pid) return;
       await this.upsertTraffic({
-        storeId: store.id,
+        channelId: store.id,
         channel: store.channel,
         date,
         productExternalId: pid,
@@ -87,7 +87,7 @@ export class ProductTrafficService {
       if (!pid || seen.has(pid)) continue;
       seen.add(pid);
       await this.upsertTraffic({
-        storeId: store.id,
+        channelId: store.id,
         channel: store.channel,
         date,
         productExternalId: pid,
@@ -102,25 +102,25 @@ export class ProductTrafficService {
 
   /** Mağazanın Account ID'sini döndürür (yoksa üretip kaydeder). */
   async ensureTrackingInfo(
-    orgId: string,
     storeId: string,
+    channelId: string,
   ): Promise<StoreTrackingInfo> {
-    await assertStoreInOrg(this.db, orgId, storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
     const [store] = await this.db
-      .select({ trackingKey: stores.trackingKey })
-      .from(stores)
-      .where(eq(stores.id, storeId))
+      .select({ trackingKey: channels.trackingKey })
+      .from(channels)
+      .where(eq(channels.id, channelId))
       .limit(1);
 
     let key = store?.trackingKey ?? null;
     if (!key) {
       key = randomBytes(16).toString("hex");
       await this.db
-        .update(stores)
+        .update(channels)
         .set({ trackingKey: key, updatedAt: new Date() })
-        .where(eq(stores.id, storeId));
+        .where(eq(channels.id, channelId));
     }
-    return { storeId, accountId: key };
+    return { channelId, accountId: key };
   }
 
   // ---- Marketplace (Amazon/eBay) traffic ----
@@ -128,10 +128,10 @@ export class ProductTrafficService {
   /** Tüm aktif Amazon/eBay mağazaları için traffic senkronla (günlük scheduler). */
   async syncAllMarketplaces(): Promise<number> {
     const rows = await this.db
-      .select({ id: stores.id })
-      .from(stores)
+      .select({ id: channels.id })
+      .from(channels)
       .where(
-        and(eq(stores.status, "active"), inArray(stores.channel, ["amazon", "ebay"])),
+        and(eq(channels.status, "active"), inArray(channels.channel, ["amazon", "ebay"])),
       );
     let n = 0;
     for (const s of rows) n += (await this.syncMarketplaceTraffic(s.id)) ? 1 : 0;
@@ -140,23 +140,23 @@ export class ProductTrafficService {
 
   /** Kimlikli tetik: org sahipliğini doğrula, traffic'i yenile. */
   async syncMarketplaceTrafficForOrg(
-    orgId: string,
     storeId: string,
+    channelId: string,
   ): Promise<boolean> {
-    await assertStoreInOrg(this.db, orgId, storeId);
-    return this.syncMarketplaceTraffic(storeId);
+    await assertStoreInOrg(this.db, storeId, channelId);
+    return this.syncMarketplaceTraffic(channelId);
   }
 
   /**
    * Bir Amazon/eBay mağazasının ürün-traffic'ini yeniler. Dev/sentetik: mağazanın
    * gerçek ürün dış kimlikleri üzerinden deterministik oturum/satış üretir (canlı
-   * ortamda kanal traffic API'sinden çekilir). Shopify/Etsy burada işlenmez.
+   * ortamda kanal traffic API'sinden çekilir). Shopify burada işlenmez.
    */
-  async syncMarketplaceTraffic(storeId: string): Promise<boolean> {
+  async syncMarketplaceTraffic(channelId: string): Promise<boolean> {
     const [store] = await this.db
-      .select({ channel: stores.channel })
-      .from(stores)
-      .where(eq(stores.id, storeId))
+      .select({ channel: channels.channel })
+      .from(channels)
+      .where(eq(channels.id, channelId))
       .limit(1);
     if (!store || (store.channel !== "amazon" && store.channel !== "ebay")) {
       return false;
@@ -165,7 +165,7 @@ export class ProductTrafficService {
     const productRows = await this.db
       .selectDistinct({ id: productProfitDaily.productExternalId })
       .from(productProfitDaily)
-      .where(eq(productProfitDaily.storeId, storeId))
+      .where(eq(productProfitDaily.channelId, channelId))
       .orderBy(productProfitDaily.productExternalId)
       .limit(20);
     const productIds = productRows
@@ -183,7 +183,7 @@ export class ProductTrafficService {
         const rate = 0.015 + (seed % 45) / 1000;
         const purchases = Math.max(0, Math.round(sessions * rate));
         await this.upsertTraffic({
-          storeId,
+          channelId,
           channel: store.channel,
           date,
           productExternalId: pid,
@@ -196,7 +196,7 @@ export class ProductTrafficService {
       }
     }
     this.logger.log(
-      `Marketplace traffic ${store.channel} mağaza=${storeId}: ${wrote} ürün-gün`,
+      `Marketplace traffic ${store.channel} mağaza=${channelId}: ${wrote} ürün-gün`,
     );
     return wrote > 0;
   }
@@ -208,7 +208,7 @@ export class ProductTrafficService {
    * `replace=true` (marketplace senkron) idempotent olarak değeri set eder.
    */
   private async upsertTraffic(input: {
-    storeId: string;
+    channelId: string;
     channel: string;
     date: string;
     productExternalId: string;
@@ -234,7 +234,7 @@ export class ProductTrafficService {
     await this.db
       .insert(productTrafficDaily)
       .values({
-        storeId: input.storeId,
+        channelId: input.channelId,
         date: input.date,
         productExternalId: input.productExternalId,
         channel: input.channel,
@@ -245,7 +245,7 @@ export class ProductTrafficService {
       })
       .onConflictDoUpdate({
         target: [
-          productTrafficDaily.storeId,
+          productTrafficDaily.channelId,
           productTrafficDaily.channel,
           productTrafficDaily.productExternalId,
           productTrafficDaily.date,

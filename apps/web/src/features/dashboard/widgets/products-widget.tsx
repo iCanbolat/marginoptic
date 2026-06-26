@@ -41,7 +41,7 @@ export function ProductsWidget({
           const net = Number(r.netProfit);
           return (
             <tr
-              key={`${r.storeId}-${r.productExternalId}`}
+              key={`${r.channelId}-${r.productExternalId}`}
               className="border-b border-border/40 last:border-0"
             >
               <td className="max-w-0 truncate py-1.5 pr-2">

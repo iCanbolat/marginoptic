@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import type { Redis } from "ioredis";
 import {
   AD_PROVIDERS,
@@ -25,22 +25,19 @@ import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
 import { REDIS } from "../../redis/redis.module";
 import {
   integrationConnections,
-  stores,
-} from "../../database/schema/stores";
+  channels,
+} from "../../database/schema/channels";
 import { AdConnectorRegistry } from "./ads/ad-connector.registry";
 import { AdsSyncService } from "../ads/ads-sync.service";
 import { SyncService } from "../sync/sync.service";
 import { ProductTrafficService } from "../tracking/product-traffic.service";
-import { BillingService } from "../billing/billing.service";
 import { ConnectorRegistry } from "./connector.registry";
-import { EtsyConnector } from "./etsy/etsy.connector";
 import { EbayConnector } from "./ebay/ebay.connector";
 import { AmazonConnector } from "./amazon/amazon.connector";
 import type { TokenSet } from "./connector.types";
 
 const PROVIDER_CATALOG: Omit<ProviderInfo, "connectable">[] = [
   { provider: "shopify", label: "Shopify", kind: "channel" },
-  { provider: "etsy", label: "Etsy", kind: "channel" },
   { provider: "ebay", label: "eBay", kind: "channel" },
   { provider: "amazon", label: "Amazon", kind: "channel" },
   { provider: "meta_ads", label: "Meta Ads", kind: "ads" },
@@ -54,17 +51,17 @@ const STATE_TTL_SECONDS = 600;
 
 /** Tüm sağlayıcılardan tek-buton senkron cooldown'ı (15 dk). */
 const SYNC_ALL_COOLDOWN_SECONDS = 900;
-const syncAllCooldownKey = (orgId: string) => `sync:all:cooldown:${orgId}`;
+const syncAllCooldownKey = (storeId: string) => `sync:all:cooldown:${storeId}`;
 
 interface OAuthState {
-  orgId: string;
+  storeId: string;
   shop: string;
   provider: IntegrationProvider;
 }
 
 interface AdOAuthState {
-  orgId: string;
   storeId: string;
+  channelId: string;
   provider: AdProvider;
 }
 
@@ -80,17 +77,15 @@ export class IntegrationsService {
     private readonly adsSync: AdsSyncService,
     private readonly sync: SyncService,
     private readonly traffic: ProductTrafficService,
-    private readonly billing: BillingService,
-    private readonly etsy: EtsyConnector,
     private readonly ebay: EbayConnector,
     private readonly amazon: AmazonConnector,
   ) {}
 
-  async overview(orgId: string): Promise<IntegrationsOverview> {
+  async overview(storeId: string): Promise<IntegrationsOverview> {
     const rows = await this.db
       .select()
       .from(integrationConnections)
-      .where(eq(integrationConnections.organizationId, orgId))
+      .where(eq(integrationConnections.storeId, storeId))
       .orderBy(integrationConnections.createdAt);
 
     return {
@@ -103,7 +98,7 @@ export class IntegrationsService {
           id: r.id,
           provider: r.provider,
           status: r.status,
-          storeId: r.storeId,
+          channelId: r.channelId,
           externalAccountId: r.externalAccountId,
           scopes: r.scopes,
           createdAt: r.createdAt.toISOString(),
@@ -113,12 +108,12 @@ export class IntegrationsService {
   }
 
   /** Shopify OAuth başlat: state üret (Redis), authorize URL döndür. */
-  async startShopifyInstall(orgId: string, shop: string): Promise<string> {
+  async startShopifyInstall(storeId: string, shop: string): Promise<string> {
     if (!this.config.get<string>("SHOPIFY_API_KEY")) {
       throw new BadRequestException("Shopify yapılandırılmamış (SHOPIFY_API_KEY)");
     }
     const state = randomBytes(16).toString("hex");
-    const payload: OAuthState = { orgId, shop, provider: "shopify" };
+    const payload: OAuthState = { storeId, shop, provider: "shopify" };
     await this.redis.set(
       `oauth:state:${state}`,
       JSON.stringify(payload),
@@ -157,8 +152,8 @@ export class IntegrationsService {
       redirectUri: this.shopifyRedirectUri(),
     });
 
-    const { storeId, connectionId } = await this.persistConnection(
-      state.orgId,
+    const { channelId, connectionId } = await this.persistConnection(
+      state.storeId,
       "shopify",
       "shopify",
       state.shop,
@@ -175,7 +170,7 @@ export class IntegrationsService {
 
     await this.sync.enqueueShopifyBackfill({
       connectionId,
-      storeId,
+      channelId,
       shop: state.shop,
     });
 
@@ -184,9 +179,9 @@ export class IntegrationsService {
 
   /** Dev-only: gerçek Shopify olmadan bağlantı simülasyonu (pipeline doğrulaması). */
   async devConnectShopify(
-    orgId: string,
+    storeId: string,
     shop: string,
-  ): Promise<{ storeId: string; connectionId: string }> {
+  ): Promise<{ channelId: string; connectionId: string }> {
     if (this.config.get("NODE_ENV") === "production") {
       throw new NotFoundException();
     }
@@ -195,112 +190,28 @@ export class IntegrationsService {
       scopes: this.config.get<string>("SHOPIFY_SCOPES") ?? null,
       externalAccountId: shop,
     };
-    const { storeId, connectionId } = await this.persistConnection(
-      orgId,
-      "shopify",
-      "shopify",
-      shop,
-      tokens,
-    );
-    await this.sync.enqueueShopifyBackfill({ connectionId, storeId, shop });
-    return { storeId, connectionId };
-  }
-
-  // ---- Etsy OAuth2 PKCE (Faz 9) ----
-
-  /** Etsy OAuth başlat: PKCE üret, verifier+state Redis'te, authorize URL döndür. */
-  async startEtsyInstall(orgId: string): Promise<string> {
-    if (!this.etsy.isConfigured()) {
-      throw new BadRequestException("Etsy yapılandırılmamış (ETSY_API_KEY)");
-    }
-    const state = randomBytes(16).toString("hex");
-    const pkce = EtsyConnector.generatePkce();
-    await this.redis.set(
-      `oauth:etsy:state:${state}`,
-      JSON.stringify({ orgId, verifier: pkce.verifier }),
-      "EX",
-      STATE_TTL_SECONDS,
-    );
-    return this.etsy.buildAuthUrl({
-      state,
-      challenge: pkce.challenge,
-      redirectUri: this.etsyRedirectUri(),
-    });
-  }
-
-  /** Etsy callback: state+verifier doğrula, token al, mağaza çöz, kaydet, backfill başlat. */
-  async completeEtsyCallback(query: Record<string, string>): Promise<string> {
-    const raw = query.state
-      ? await this.redis.getdel(`oauth:etsy:state:${query.state}`)
-      : null;
-    if (!raw) throw new BadRequestException("Geçersiz veya süresi dolmuş state");
-    const { orgId, verifier } = JSON.parse(raw) as {
-      orgId: string;
-      verifier: string;
-    };
-    if (!query.code) throw new BadRequestException("Yetkilendirme kodu yok");
-
-    const tokens = await this.etsy.exchangeCode({
-      code: query.code,
-      verifier,
-      redirectUri: this.etsyRedirectUri(),
-    });
-    const shop = await this.etsy.fetchShop(tokens.accessToken);
-
-    const { storeId, connectionId } = await this.persistConnection(
-      orgId,
-      "etsy",
-      "etsy",
-      shop.shopName,
-      { ...tokens, externalAccountId: shop.shopId },
-    );
-    await this.sync.enqueueEtsyBackfill({
-      connectionId,
+    const { channelId, connectionId } = await this.persistConnection(
       storeId,
-      shopId: shop.shopId,
-    });
-    return `${this.config.getOrThrow<string>("WEB_ORIGIN")}/integrations?connected=etsy`;
-  }
-
-  /** Dev-only: gerçek Etsy olmadan bağlantı simülasyonu (sentetik pipeline). */
-  async devConnectEtsy(
-    orgId: string,
-    shop: string,
-  ): Promise<{ storeId: string; connectionId: string }> {
-    if (this.config.get("NODE_ENV") === "production") {
-      throw new NotFoundException();
-    }
-    const tokens: TokenSet = {
-      accessToken: `dev_${randomBytes(12).toString("hex")}`,
-      externalAccountId: shop,
-      scopes: "transactions_r listings_r shops_r",
-    };
-    const { storeId, connectionId } = await this.persistConnection(
-      orgId,
-      "etsy",
-      "etsy",
+      "shopify",
+      "shopify",
       shop,
       tokens,
     );
-    await this.sync.enqueueEtsyBackfill({ connectionId, storeId, shopId: shop });
-    return { storeId, connectionId };
-  }
-
-  private etsyRedirectUri(): string {
-    return `${this.config.getOrThrow<string>("APP_URL")}/api/integrations/etsy/callback`;
+    await this.sync.enqueueShopifyBackfill({ connectionId, channelId, shop });
+    return { channelId, connectionId };
   }
 
   // ---- eBay OAuth2 (Faz 10) ----
 
   /** eBay OAuth başlat: state üret (Redis), authorize URL döndür. */
-  async startEbayInstall(orgId: string): Promise<string> {
+  async startEbayInstall(storeId: string): Promise<string> {
     if (!this.ebay.isConfigured()) {
       throw new BadRequestException("eBay yapılandırılmamış (EBAY_CLIENT_ID)");
     }
     const state = randomBytes(16).toString("hex");
     await this.redis.set(
       `oauth:ebay:state:${state}`,
-      JSON.stringify({ orgId }),
+      JSON.stringify({ storeId }),
       "EX",
       STATE_TTL_SECONDS,
     );
@@ -316,7 +227,7 @@ export class IntegrationsService {
       ? await this.redis.getdel(`oauth:ebay:state:${query.state}`)
       : null;
     if (!raw) throw new BadRequestException("Geçersiz veya süresi dolmuş state");
-    const { orgId } = JSON.parse(raw) as { orgId: string };
+    const { storeId } = JSON.parse(raw) as { storeId: string };
     if (!query.code) throw new BadRequestException("Yetkilendirme kodu yok");
 
     const tokens = await this.ebay.exchangeCode({
@@ -325,8 +236,8 @@ export class IntegrationsService {
     });
     const seller = await this.ebay.fetchSeller(tokens.accessToken);
 
-    const { storeId, connectionId } = await this.persistConnection(
-      orgId,
+    const { channelId, connectionId } = await this.persistConnection(
+      storeId,
       "ebay",
       "ebay",
       seller.sellerName,
@@ -334,7 +245,7 @@ export class IntegrationsService {
     );
     await this.sync.enqueueEbayBackfill({
       connectionId,
-      storeId,
+      channelId,
       shopId: seller.sellerId,
     });
     return `${this.config.getOrThrow<string>("WEB_ORIGIN")}/integrations?connected=ebay`;
@@ -342,9 +253,9 @@ export class IntegrationsService {
 
   /** Dev-only: gerçek eBay olmadan bağlantı simülasyonu (sentetik pipeline). */
   async devConnectEbay(
-    orgId: string,
+    storeId: string,
     shop: string,
-  ): Promise<{ storeId: string; connectionId: string }> {
+  ): Promise<{ channelId: string; connectionId: string }> {
     if (this.config.get("NODE_ENV") === "production") {
       throw new NotFoundException();
     }
@@ -353,15 +264,15 @@ export class IntegrationsService {
       externalAccountId: shop,
       scopes: this.config.get<string>("EBAY_SCOPES") ?? null,
     };
-    const { storeId, connectionId } = await this.persistConnection(
-      orgId,
+    const { channelId, connectionId } = await this.persistConnection(
+      storeId,
       "ebay",
       "ebay",
       shop,
       tokens,
     );
-    await this.sync.enqueueEbayBackfill({ connectionId, storeId, shopId: shop });
-    return { storeId, connectionId };
+    await this.sync.enqueueEbayBackfill({ connectionId, channelId, shopId: shop });
+    return { channelId, connectionId };
   }
 
   private ebayRedirectUri(): string {
@@ -371,14 +282,14 @@ export class IntegrationsService {
   // ---- Amazon SP-API / LWA (Faz 10) ----
 
   /** Amazon OAuth başlat: state üret (Redis), Seller Central consent URL döndür. */
-  async startAmazonInstall(orgId: string): Promise<string> {
+  async startAmazonInstall(storeId: string): Promise<string> {
     if (!this.amazon.isConfigured()) {
       throw new BadRequestException("Amazon yapılandırılmamış (AMAZON_LWA_CLIENT_ID)");
     }
     const state = randomBytes(16).toString("hex");
     await this.redis.set(
       `oauth:amazon:state:${state}`,
-      JSON.stringify({ orgId }),
+      JSON.stringify({ storeId }),
       "EX",
       STATE_TTL_SECONDS,
     );
@@ -394,7 +305,7 @@ export class IntegrationsService {
       ? await this.redis.getdel(`oauth:amazon:state:${query.state}`)
       : null;
     if (!raw) throw new BadRequestException("Geçersiz veya süresi dolmuş state");
-    const { orgId } = JSON.parse(raw) as { orgId: string };
+    const { storeId } = JSON.parse(raw) as { storeId: string };
     // Amazon yetki kodunu `spapi_oauth_code` query parametresiyle döndürür.
     const code = query.spapi_oauth_code ?? query.code;
     if (!code) throw new BadRequestException("Yetkilendirme kodu yok");
@@ -405,8 +316,8 @@ export class IntegrationsService {
     });
     const seller = await this.amazon.fetchSeller(tokens.accessToken);
 
-    const { storeId, connectionId } = await this.persistConnection(
-      orgId,
+    const { channelId, connectionId } = await this.persistConnection(
+      storeId,
       "amazon",
       "amazon",
       seller.sellerName,
@@ -414,7 +325,7 @@ export class IntegrationsService {
     );
     await this.sync.enqueueAmazonBackfill({
       connectionId,
-      storeId,
+      channelId,
       shopId: seller.sellerId,
     });
     return `${this.config.getOrThrow<string>("WEB_ORIGIN")}/integrations?connected=amazon`;
@@ -422,9 +333,9 @@ export class IntegrationsService {
 
   /** Dev-only: gerçek Amazon olmadan bağlantı simülasyonu (sentetik pipeline). */
   async devConnectAmazon(
-    orgId: string,
+    storeId: string,
     shop: string,
-  ): Promise<{ storeId: string; connectionId: string }> {
+  ): Promise<{ channelId: string; connectionId: string }> {
     if (this.config.get("NODE_ENV") === "production") {
       throw new NotFoundException();
     }
@@ -433,15 +344,15 @@ export class IntegrationsService {
       externalAccountId: shop,
       scopes: this.config.get<string>("AMAZON_SCOPES") ?? null,
     };
-    const { storeId, connectionId } = await this.persistConnection(
-      orgId,
+    const { channelId, connectionId } = await this.persistConnection(
+      storeId,
       "amazon",
       "amazon",
       shop,
       tokens,
     );
-    await this.sync.enqueueAmazonBackfill({ connectionId, storeId, shopId: shop });
-    return { storeId, connectionId };
+    await this.sync.enqueueAmazonBackfill({ connectionId, channelId, shopId: shop });
+    return { channelId, connectionId };
   }
 
   private amazonRedirectUri(): string {
@@ -456,10 +367,6 @@ export class IntegrationsService {
 
   private isConnectable(provider: IntegrationProvider): boolean {
     if (this.isAdProvider(provider)) return this.adRegistry.has(provider);
-    // Etsy: canlı OAuth yapılandırıldıysa ya da non-prod (dev-connect mevcut).
-    if (provider === "etsy") {
-      return this.etsy.isConfigured() || this.config.get("NODE_ENV") !== "production";
-    }
     // eBay: canlı OAuth yapılandırıldıysa ya da non-prod (dev-connect mevcut).
     if (provider === "ebay") {
       return this.ebay.isConfigured() || this.config.get("NODE_ENV") !== "production";
@@ -473,17 +380,17 @@ export class IntegrationsService {
 
   /** Reklam OAuth başlat: state üret (Redis), authorize URL döndür. */
   async startAdInstall(
-    orgId: string,
-    provider: AdProvider,
     storeId: string,
+    provider: AdProvider,
+    channelId: string,
   ): Promise<string> {
-    await this.assertStoreOwned(orgId, storeId);
+    await this.assertStoreOwned(storeId, channelId);
     const connector = this.adRegistry.get(provider);
     if (!connector.isConfigured()) {
       throw new BadRequestException(`${provider} yapılandırılmamış`);
     }
     const state = randomBytes(16).toString("hex");
-    const payload: AdOAuthState = { orgId, storeId, provider };
+    const payload: AdOAuthState = { storeId, channelId, provider };
     await this.redis.set(
       `oauth:ad:state:${state}`,
       JSON.stringify(payload),
@@ -522,15 +429,15 @@ export class IntegrationsService {
     }
 
     const { connectionId } = await this.persistAdConnection(
-      state.orgId,
-      provider,
       state.storeId,
+      provider,
+      state.channelId,
       externalAccountId,
       tokens,
     );
     await this.adsSync.enqueueBackfill({
       connectionId,
-      storeId: state.storeId,
+      channelId: state.channelId,
       provider,
       externalAccountId,
     });
@@ -539,29 +446,29 @@ export class IntegrationsService {
 
   /** Dev-only: gerçek reklam OAuth'u olmadan bağlantı simülasyonu (sentetik pipeline). */
   async devConnectAd(
-    orgId: string,
-    provider: AdProvider,
     storeId: string,
+    provider: AdProvider,
+    channelId: string,
     externalAccountId: string,
   ): Promise<{ connectionId: string; provider: AdProvider }> {
     if (this.config.get("NODE_ENV") === "production") {
       throw new NotFoundException();
     }
-    await this.assertStoreOwned(orgId, storeId);
+    await this.assertStoreOwned(storeId, channelId);
     const tokens: TokenSet = {
       accessToken: `dev_${randomBytes(12).toString("hex")}`,
       externalAccountId,
     };
     const { connectionId } = await this.persistAdConnection(
-      orgId,
-      provider,
       storeId,
+      provider,
+      channelId,
       externalAccountId,
       tokens,
     );
     await this.adsSync.enqueueBackfill({
       connectionId,
-      storeId,
+      channelId,
       provider,
       externalAccountId,
     });
@@ -572,27 +479,27 @@ export class IntegrationsService {
     return `${this.config.getOrThrow<string>("APP_URL")}/api/integrations/ads/${provider}/callback`;
   }
 
-  private async assertStoreOwned(orgId: string, storeId: string): Promise<void> {
+  private async assertStoreOwned(storeId: string, channelId: string): Promise<void> {
     const [row] = await this.db
-      .select({ id: stores.id })
-      .from(stores)
-      .where(and(eq(stores.id, storeId), eq(stores.organizationId, orgId)))
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(eq(channels.id, channelId), eq(channels.storeId, storeId)))
       .limit(1);
     if (!row) throw new NotFoundException("Mağaza bulunamadı");
   }
 
   private async persistAdConnection(
-    orgId: string,
-    provider: AdProvider,
     storeId: string,
+    provider: AdProvider,
+    channelId: string,
     externalAccountId: string,
     tokens: TokenSet,
   ): Promise<{ connectionId: string }> {
     const [connection] = await this.db
       .insert(integrationConnections)
       .values({
-        organizationId: orgId,
-        storeId,
+        storeId: storeId,
+        channelId,
         provider,
         status: "active",
         accessTokenEnc: this.crypto.encrypt(tokens.accessToken),
@@ -606,12 +513,12 @@ export class IntegrationsService {
       })
       .onConflictDoUpdate({
         target: [
-          integrationConnections.organizationId,
+          integrationConnections.storeId,
           integrationConnections.provider,
           integrationConnections.externalAccountId,
         ],
         set: {
-          storeId,
+          channelId,
           status: "active",
           accessTokenEnc: this.crypto.encrypt(tokens.accessToken),
           refreshTokenEnc: tokens.refreshToken
@@ -647,13 +554,13 @@ export class IntegrationsService {
     });
   }
 
-  async disconnect(orgId: string, connectionId: string): Promise<void> {
+  async disconnect(storeId: string, connectionId: string): Promise<void> {
     const [conn] = await this.db
       .select()
       .from(integrationConnections)
       .where(
         and(
-          eq(integrationConnections.organizationId, orgId),
+          eq(integrationConnections.storeId, storeId),
           eq(integrationConnections.id, connectionId),
         ),
       )
@@ -670,19 +577,19 @@ export class IntegrationsService {
       })
       .where(eq(integrationConnections.id, connectionId));
 
-    if (conn.storeId) {
+    if (conn.channelId) {
       await this.db
-        .update(stores)
+        .update(channels)
         .set({ status: "disconnected", updatedAt: new Date() })
-        .where(eq(stores.id, conn.storeId));
+        .where(eq(channels.id, conn.channelId));
     }
   }
 
   // ---- Tüm sağlayıcılardan tek-buton senkron (+ cooldown) ----
 
   /** Cooldown durumu (sayfa ilk yüklemede butonu doğru göstermek için). */
-  async syncAllStatus(orgId: string): Promise<SyncAllStatus> {
-    const ttl = await this.redis.ttl(syncAllCooldownKey(orgId));
+  async syncAllStatus(storeId: string): Promise<SyncAllStatus> {
+    const ttl = await this.redis.ttl(syncAllCooldownKey(storeId));
     if (ttl > 0) {
       return {
         onCooldown: true,
@@ -702,8 +609,8 @@ export class IntegrationsService {
    * rollup zinciri), reklam hesapları (ads backfill) ve marketplace traffic.
    * 15 dk cooldown uygulanır; cooldown aktifse iş kuyruğa alınmaz (triggered=false).
    */
-  async syncAllForOrg(orgId: string): Promise<SyncAllResult> {
-    const key = syncAllCooldownKey(orgId);
+  async syncAllForOrg(storeId: string): Promise<SyncAllResult> {
+    const key = syncAllCooldownKey(storeId);
     const ttl = await this.redis.ttl(key);
     if (ttl > 0) {
       return {
@@ -718,13 +625,13 @@ export class IntegrationsService {
       .select({
         id: integrationConnections.id,
         provider: integrationConnections.provider,
-        storeId: integrationConnections.storeId,
+        channelId: integrationConnections.channelId,
         externalAccountId: integrationConnections.externalAccountId,
       })
       .from(integrationConnections)
       .where(
         and(
-          eq(integrationConnections.organizationId, orgId),
+          eq(integrationConnections.storeId, storeId),
           eq(integrationConnections.status, "active"),
         ),
       );
@@ -734,12 +641,12 @@ export class IntegrationsService {
     const marketplaceStores = new Set<string>();
 
     for (const c of conns) {
-      if (!c.storeId) continue;
+      if (!c.channelId) continue;
       const account = c.externalAccountId ?? "";
       if (this.isAdProvider(c.provider)) {
         await this.adsSync.enqueueBackfill({
           connectionId: c.id,
-          storeId: c.storeId,
+          channelId: c.channelId,
           provider: c.provider,
           externalAccountId: account,
         });
@@ -750,32 +657,25 @@ export class IntegrationsService {
         case "shopify":
           await this.sync.enqueueShopifyBackfill({
             connectionId: c.id,
-            storeId: c.storeId,
+            channelId: c.channelId,
             shop: account,
-          });
-          break;
-        case "etsy":
-          await this.sync.enqueueEtsyBackfill({
-            connectionId: c.id,
-            storeId: c.storeId,
-            shopId: account,
           });
           break;
         case "ebay":
           await this.sync.enqueueEbayBackfill({
             connectionId: c.id,
-            storeId: c.storeId,
+            channelId: c.channelId,
             shopId: account,
           });
-          marketplaceStores.add(c.storeId);
+          marketplaceStores.add(c.channelId);
           break;
         case "amazon":
           await this.sync.enqueueAmazonBackfill({
             connectionId: c.id,
-            storeId: c.storeId,
+            channelId: c.channelId,
             shopId: account,
           });
-          marketplaceStores.add(c.storeId);
+          marketplaceStores.add(c.channelId);
           break;
         default:
           continue;
@@ -784,8 +684,8 @@ export class IntegrationsService {
     }
 
     // Marketplace (Amazon/eBay) ürün-traffic'ini yenile (conversion kartı için).
-    for (const storeId of marketplaceStores) {
-      await this.traffic.syncMarketplaceTraffic(storeId);
+    for (const channelId of marketplaceStores) {
+      await this.traffic.syncMarketplaceTraffic(channelId);
     }
 
     // Cooldown'ı ayarla (15 dk).
@@ -810,19 +710,18 @@ export class IntegrationsService {
   }
 
   private async persistConnection(
-    orgId: string,
+    storeId: string,
     channel: SalesChannel,
     provider: IntegrationProvider,
     shop: string,
     tokens: TokenSet,
-  ): Promise<{ storeId: string; connectionId: string }> {
-    // Plan gating: yeni mağaza limiti aşılıyorsa 403 (reconnect muaf).
-    await this.billing.assertCanAddStore(orgId, shop);
+  ): Promise<{ channelId: string; connectionId: string }> {
     return this.db.transaction(async (tx) => {
+      // Store başına kanal-tekilliği: aynı kanal yeniden bağlanırsa üzerine yazılır.
       const [store] = await tx
-        .insert(stores)
+        .insert(channels)
         .values({
-          organizationId: orgId,
+          storeId: storeId,
           channel,
           name: shop.replace(/\.myshopify\.com$/, ""),
           externalShopId: shop,
@@ -830,16 +729,22 @@ export class IntegrationsService {
           status: "active",
         })
         .onConflictDoUpdate({
-          target: [stores.organizationId, stores.channel, stores.externalShopId],
-          set: { status: "active", updatedAt: new Date() },
+          target: [channels.storeId, channels.channel],
+          set: {
+            name: shop.replace(/\.myshopify\.com$/, ""),
+            externalShopId: shop,
+            domain: shop,
+            status: "active",
+            updatedAt: new Date(),
+          },
         })
-        .returning({ id: stores.id });
+        .returning({ id: channels.id });
 
       const [connection] = await tx
         .insert(integrationConnections)
         .values({
-          organizationId: orgId,
-          storeId: store.id,
+          storeId: storeId,
+          channelId: store.id,
           provider,
           status: "active",
           accessTokenEnc: this.crypto.encrypt(tokens.accessToken),
@@ -853,12 +758,12 @@ export class IntegrationsService {
         })
         .onConflictDoUpdate({
           target: [
-            integrationConnections.organizationId,
+            integrationConnections.storeId,
             integrationConnections.provider,
             integrationConnections.externalAccountId,
           ],
           set: {
-            storeId: store.id,
+            channelId: store.id,
             status: "active",
             accessTokenEnc: this.crypto.encrypt(tokens.accessToken),
             scopes: tokens.scopes ?? null,
@@ -867,7 +772,19 @@ export class IntegrationsService {
         })
         .returning({ id: integrationConnections.id });
 
-      return { storeId: store.id, connectionId: connection.id };
+      // Store başına kanal-tekilliği: aynı kanalın (farklı hesap/domain ile bağlanmış)
+      // bayat bağlantılarını temizle — overview'da tek aktif kanal kalsın.
+      await tx
+        .delete(integrationConnections)
+        .where(
+          and(
+            eq(integrationConnections.channelId, store.id),
+            eq(integrationConnections.provider, provider),
+            ne(integrationConnections.id, connection.id),
+          ),
+        );
+
+      return { channelId: store.id, connectionId: connection.id };
     });
   }
 }

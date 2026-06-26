@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useAuthStore } from "@/lib/auth/store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IntegrationCard } from "./components/integration-card";
 import { ConnectionsTable } from "./components/connections-table";
 import { ConnectShopifyDialog } from "./components/connect-shopify-dialog";
-import { ConnectEtsyDialog } from "./components/connect-etsy-dialog";
 import { ConnectEbayDialog } from "./components/connect-ebay-dialog";
 import { ConnectAmazonDialog } from "./components/connect-amazon-dialog";
 import { ConnectAdsDialog } from "./components/connect-ads-dialog";
@@ -21,15 +19,13 @@ import type {
 
 export function IntegrationsPage() {
   const qc = useQueryClient();
-  const role = useAuthStore((s) => s.activeOrg?.role);
-  const canManage = role === "owner" || role === "admin";
+  const canManage = true;
 
   const overviewQ = useIntegrationsOverview();
   const disconnect = useDisconnect();
 
   // Açık connect dialog'ları (her biri lokal UI durumu).
   const [shopifyOpen, setShopifyOpen] = useState(false);
-  const [etsyOpen, setEtsyOpen] = useState(false);
   const [ebayOpen, setEbayOpen] = useState(false);
   const [amazonOpen, setAmazonOpen] = useState(false);
   const [adsProvider, setAdsProvider] = useState<AdProvider | null>(null);
@@ -56,7 +52,6 @@ export function IntegrationsPage() {
 
   function handleConnect(provider: IntegrationProvider) {
     if (provider === "shopify") setShopifyOpen(true);
-    else if (provider === "etsy") setEtsyOpen(true);
     else if (provider === "ebay") setEbayOpen(true);
     else if (provider === "amazon") setAmazonOpen(true);
     else setAdsProvider(provider as AdProvider);
@@ -120,7 +115,6 @@ export function IntegrationsPage() {
             open={shopifyOpen}
             onOpenChange={setShopifyOpen}
           />
-          <ConnectEtsyDialog open={etsyOpen} onOpenChange={setEtsyOpen} />
           <ConnectEbayDialog open={ebayOpen} onOpenChange={setEbayOpen} />
           <ConnectAmazonDialog open={amazonOpen} onOpenChange={setAmazonOpen} />
           <ConnectAdsDialog

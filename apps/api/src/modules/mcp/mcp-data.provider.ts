@@ -9,7 +9,7 @@ import type {
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
 import { AnalyticsService } from "../analytics/analytics.service";
 import { num, pctChange } from "../analytics/analytics-math";
-import { resolveOrgStores } from "../analytics/org-stores";
+import { resolveStoreChannels } from "../analytics/store-channels";
 
 /**
  * Faz 8 — MCP tool'larının somut veri kaynağı.
@@ -23,8 +23,8 @@ export class McpDataProviderService implements McpDataProvider {
   ) {}
 
   async listStores(ctx: McpToolContext): Promise<McpStoreInfo[]> {
-    const stores = await resolveOrgStores(this.db, ctx.orgId, []);
-    return stores.map((s) => ({
+    const channels = await resolveStoreChannels(this.db, ctx.storeId, []);
+    return channels.map((s) => ({
       id: s.id,
       name: s.name,
       currency: s.currency,
@@ -33,11 +33,11 @@ export class McpDataProviderService implements McpDataProvider {
   }
 
   getProfitSummary(ctx: McpToolContext, filter: AnalyticsFilter) {
-    return this.analytics.profitSummary(ctx.orgId, filter);
+    return this.analytics.profitSummary(ctx.storeId, filter);
   }
 
   getPnl(ctx: McpToolContext, filter: AnalyticsFilter) {
-    return this.analytics.pnl(ctx.orgId, filter);
+    return this.analytics.pnl(ctx.storeId, filter);
   }
 
   topProductsByProfit(
@@ -45,7 +45,7 @@ export class McpDataProviderService implements McpDataProvider {
     filter: AnalyticsFilter,
     limit: number,
   ) {
-    return this.analytics.productRanking(ctx.orgId, filter, limit);
+    return this.analytics.productRanking(ctx.storeId, filter, limit);
   }
 
   getAdPerformance(
@@ -53,7 +53,7 @@ export class McpDataProviderService implements McpDataProvider {
     filter: AnalyticsFilter,
     level: AdLevel,
   ) {
-    return this.analytics.adsPerformance(ctx.orgId, filter, level);
+    return this.analytics.adsPerformance(ctx.storeId, filter, level);
   }
 
   async comparePeriods(
@@ -63,13 +63,13 @@ export class McpDataProviderService implements McpDataProvider {
     storeIds: string[],
   ): Promise<ComparePeriodsResult> {
     const [ra, rb] = await Promise.all([
-      this.analytics.profitSummary(ctx.orgId, {
+      this.analytics.profitSummary(ctx.storeId, {
         from: a.from,
         to: a.to,
         storeIds,
         compare: false,
       }),
-      this.analytics.profitSummary(ctx.orgId, {
+      this.analytics.profitSummary(ctx.storeId, {
         from: b.from,
         to: b.to,
         storeIds,
