@@ -1,8 +1,9 @@
 import { InjectFlowProducer, InjectQueue } from "@nestjs/bullmq";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { FlowProducer, Queue, type JobsOptions } from "bullmq";
 import { eq } from "drizzle-orm";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
+import { BillingService } from "../billing/billing.service";
 import { syncState } from "../../database/schema/channels";
 import {
   METRICS_FLOW_PRODUCER,
@@ -41,12 +42,29 @@ const FLOW_JOB_OPTS: JobsOptions = {
 
 @Injectable()
 export class SyncService {
+  private readonly logger = new Logger(SyncService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     @InjectQueue(QUEUE_WEBHOOKS) private readonly webhookQueue: Queue<WebhookJob>,
     @InjectFlowProducer(METRICS_FLOW_PRODUCER)
     private readonly flow: FlowProducer,
+    private readonly billing: BillingService,
   ) {}
+
+  /**
+   * Soft cap: aylık sipariş limiti aşıldıysa YENİ backfill/poll içe-aktarımları
+   * duraklatılır (gerçek-zamanlı webhook'lar etkilenmez; veri asla düşmez).
+   */
+  private async backfillAllowed(channelId: string): Promise<boolean> {
+    const over = await this.billing.isOverOrderLimitForChannel(channelId);
+    if (over) {
+      this.logger.warn(
+        `Aylık sipariş limiti aşıldı; backfill atlanıyor channel=${channelId}`,
+      );
+    }
+    return !over;
+  }
 
   /**
    * İlk tam içe-aktarımı (orders/products/customers) kuyruğa alır ve sonrasına
@@ -57,6 +75,7 @@ export class SyncService {
     channelId: string;
     shop: string;
   }): Promise<void> {
+    if (!(await this.backfillAllowed(args.channelId))) return;
     for (const resource of SHOPIFY_SYNC_RESOURCES) {
       await this.setSyncState(args.connectionId, resource, "queued");
     }
@@ -85,6 +104,7 @@ export class SyncService {
     shopId: string;
     since?: string;
   }): Promise<void> {
+    if (!(await this.backfillAllowed(args.channelId))) return;
     for (const resource of EBAY_SYNC_RESOURCES) {
       await this.setSyncState(args.connectionId, resource, "queued");
     }
@@ -113,6 +133,7 @@ export class SyncService {
     shopId: string;
     since?: string;
   }): Promise<void> {
+    if (!(await this.backfillAllowed(args.channelId))) return;
     for (const resource of AMAZON_SYNC_RESOURCES) {
       await this.setSyncState(args.connectionId, resource, "queued");
     }

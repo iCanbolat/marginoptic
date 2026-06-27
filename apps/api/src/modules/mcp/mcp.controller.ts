@@ -2,8 +2,10 @@ import { Controller, Delete, Get, Post, Req, Res } from "@nestjs/common";
 import { ApiExcludeController } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { handleMcpRequest } from "@churnify/mcp";
+import { planAllows } from "@churnify/shared";
 import { Public } from "../auth/decorators/public.decorator";
 import { ApiKeysService } from "../api-keys/api-keys.service";
+import { BillingService } from "../billing/billing.service";
 import { McpDataProviderService } from "./mcp-data.provider";
 
 /** Authorization: Bearer <key> veya x-api-key header'ından ham anahtarı çıkarır. */
@@ -29,6 +31,7 @@ export class McpController {
   constructor(
     private readonly apiKeys: ApiKeysService,
     private readonly provider: McpDataProviderService,
+    private readonly billing: BillingService,
   ) {}
 
   @Post()
@@ -63,6 +66,18 @@ export class McpController {
         });
       return;
     }
+
+    // MCP yalnız Pro plana özel: anahtar sahibinin (mağaza) planını doğrula.
+    const ent = await this.billing.entitlementForStore(verified.storeId);
+    if (!ent || !planAllows(ent.plan, "mcp")) {
+      res.status(403).json({
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32003, message: "MCP (AI analizi) Pro plana özeldir" },
+      });
+      return;
+    }
+
     await handleMcpRequest({
       provider: this.provider,
       context: { storeId: verified.storeId },

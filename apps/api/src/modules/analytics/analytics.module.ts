@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AdsModule } from "../ads/ads.module";
+import { BillingModule } from "../billing/billing.module";
+import { RequiresFeatureGuard } from "../auth/guards/requires-feature.guard";
 import { ProfitModule } from "../profit/profit.module";
 import { AnalyticsController } from "./analytics.controller";
 import { AnalyticsService } from "./analytics.service";
@@ -19,7 +21,7 @@ import { ProductLinksService } from "./product-links.service";
  * (widget layout persist). Reklam performansı için `AdsQueryService` yeniden kullanılır.
  */
 @Module({
-  imports: [AdsModule, ProfitModule],
+  imports: [AdsModule, ProfitModule, BillingModule],
   controllers: [
     AnalyticsController,
     DashboardsController,
@@ -33,6 +35,7 @@ import { ProductLinksService } from "./product-links.service";
     CustomMetricsService,
     ProductAnalyticsService,
     ProductLinksService,
+    RequiresFeatureGuard,
   ],
   exports: [AnalyticsService],
 })

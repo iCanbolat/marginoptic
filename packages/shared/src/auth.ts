@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PlanEntitlement } from "./billing.js";
 
 // ---------------------------------------------------------------------------
 // İstek (request) şemaları — hem API (ZodValidationPipe) hem web (react-hook-form)
@@ -57,6 +58,8 @@ export interface SessionResponse {
 export interface MeResponse {
   user: AuthUser;
   stores: StoreView[];
+  /** Efektif plan + özellik/limitler + kullanım (frontend gating için). */
+  entitlement: PlanEntitlement;
 }
 
 export interface SwitchStoreResponse {

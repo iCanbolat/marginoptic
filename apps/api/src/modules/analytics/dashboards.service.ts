@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -11,14 +12,29 @@ import type {
   DashboardUpdateInput,
   DashboardWidget,
   DashboardWidgetsInput,
+  Feature,
 } from "@churnify/shared";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
 import { dashboards, dashboardWidgets } from "../../database/schema/dashboards";
+import { BillingService } from "../billing/billing.service";
+
+/**
+ * Pro plana özel widget tipleri → gerektirdikleri özellik.
+ * Not: `products` widget'ı starter panoda yer aldığından layout'ta kalmasına izin
+ * verilir; verisi yine de `/analytics/products` ucunda korunur ve Basic'te kilitli
+ * gösterilir. Yalnız `custom_metric` (kullanıcı tarafından eklenir) burada engellenir.
+ */
+const PRO_WIDGET_FEATURE: Partial<Record<DashboardWidget["type"], Feature>> = {
+  custom_metric: "customMetrics",
+};
 
 /** Faz 7 — Pano CRUD + widget layout persist (org başına bir varsayılan). */
 @Injectable()
 export class DashboardsService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly billing: BillingService,
+  ) {}
 
   async list(storeId: string): Promise<DashboardSummary[]> {
     const rows = await this.db
@@ -161,6 +177,7 @@ export class DashboardsService {
     input: DashboardWidgetsInput,
   ): Promise<DashboardDetail> {
     await this.assertExists(storeId, id);
+    await this.assertWidgetsAllowed(storeId, input.widgets);
     await this.db.transaction(async (tx) => {
       await tx
         .delete(dashboardWidgets)
@@ -189,6 +206,32 @@ export class DashboardsService {
   }
 
   // ---- iç ----
+
+  /**
+   * Pro plana özel widget tipleri (custom_metric → customMetrics, products →
+   * productProfitability) yalnız ilgili özelliğe sahip planlarda kaydedilebilir.
+   */
+  private async assertWidgetsAllowed(
+    storeId: string,
+    widgets: DashboardWidgetsInput["widgets"],
+  ): Promise<void> {
+    const needed = new Set<Feature>();
+    for (const w of widgets) {
+      const feature = PRO_WIDGET_FEATURE[w.type];
+      if (feature) needed.add(feature);
+    }
+    if (needed.size === 0) return;
+    const ent = await this.billing.entitlementForStore(storeId);
+    for (const feature of needed) {
+      if (!ent?.features[feature]) {
+        throw new ForbiddenException({
+          code: "FEATURE_LOCKED",
+          feature,
+          message: "Bu widget Pro plana özeldir. Planınızı yükseltin.",
+        });
+      }
+    }
+  }
 
   private async loadWidgets(dashboardId: string): Promise<DashboardWidget[]> {
     const rows = await this.db

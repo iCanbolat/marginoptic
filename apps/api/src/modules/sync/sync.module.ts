@@ -1,5 +1,6 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
+import { BillingModule } from "../billing/billing.module";
 import { IngestionModule } from "../ingestion/ingestion.module";
 import { METRICS_FLOW_PRODUCER } from "../profit/profit.constants";
 import { AmazonSyncProcessor } from "./processors/amazon-sync.processor";
@@ -21,6 +22,7 @@ import { SyncService } from "./sync.service";
 @Module({
   imports: [
     IngestionModule,
+    BillingModule,
     BullModule.registerQueue(
       { name: QUEUE_SHOPIFY_SYNC },
       { name: QUEUE_EBAY_SYNC },

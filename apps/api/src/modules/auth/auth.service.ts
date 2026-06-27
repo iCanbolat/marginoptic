@@ -14,6 +14,7 @@ import type {
 } from "@churnify/shared";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
 import { stores, users } from "../../database/schema/auth";
+import { BillingService } from "../billing/billing.service";
 import { slugify } from "../stores/slug.util";
 import { StoresService } from "../stores/stores.service";
 import { UsersService, type UserRow } from "../users/users.service";
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly orgs: StoresService,
     private readonly tokens: TokenService,
+    private readonly billing: BillingService,
   ) {}
 
   async register(input: RegisterInput): Promise<IssuedSession> {
@@ -155,6 +157,7 @@ export class AuthService {
     return {
       user: toAuthUser(user),
       stores: await this.orgs.listForUser(userId),
+      entitlement: await this.billing.entitlementSummary(userId),
     };
   }
 

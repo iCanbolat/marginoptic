@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
+import { BillingService } from "../billing/billing.service";
 import {
   customers,
   orderLineItems,
@@ -24,11 +25,14 @@ import type {
  */
 @Injectable()
 export class IngestionService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly billing: BillingService,
+  ) {}
 
   /** Sipariş + satırları + hareketleri + iadeleri tek transaction'da yazar. */
   async upsertOrder(channelId: string, o: NormalizedOrder): Promise<string> {
-    return this.db.transaction(async (tx) => {
+    const { orderId, inserted } = await this.db.transaction(async (tx) => {
       const now = new Date();
       const [row] = await tx
         .insert(orders)
@@ -78,7 +82,8 @@ export class IngestionService {
             updatedAt: now,
           },
         })
-        .returning({ id: orders.id });
+        // `(xmax = 0)` Postgres upsert deyimi: yeni INSERT'te true, conflict-UPDATE'te false.
+        .returning({ id: orders.id, inserted: sql<boolean>`(xmax = 0)` });
       const orderId = row.id;
 
       // Satırlar sipariş gövdesiyle birlikte gelir → tam değiştir (silinenler de yansısın).
@@ -135,8 +140,13 @@ export class IngestionService {
         await this.insertRefund(tx, channelId, orderId, r);
       }
 
-      return orderId;
+      return { orderId, inserted: row.inserted };
     });
+
+    // Soft cap: yalnız YENİ sipariş aylık kullanım sayacını artırır (commit sonrası,
+    // best-effort; sayım hatası sipariş yazımını bozmaz, veri asla düşmez).
+    if (inserted) await this.billing.recordOrderIngested(channelId);
+    return orderId;
   }
 
   /** Sipariş + ilişkili satır/hareket/iadeleri toplu yazar; yazılan sipariş sayısını döner. */

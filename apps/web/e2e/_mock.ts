@@ -9,7 +9,29 @@ export const ORG = {
 };
 export const USER = { id: "u-1", email: "owner@test.com", name: "Owner User" };
 export const SESSION = { accessToken: "tok_test", user: USER, activeOrg: ORG };
-export const ME = { user: USER, organizations: [ORG] };
+const FREE_FEATURES = {
+  productProfitability: false,
+  campaignProfitability: false,
+  customMetrics: false,
+  mcp: false,
+};
+const FREE_USAGE = {
+  stores: 0,
+  storeLimit: 1,
+  channels: 0,
+  channelLimit: 1,
+  ordersThisMonth: 0,
+  ordersPerMonth: 0,
+  overLimit: false,
+};
+const FREE_ENTITLEMENT = {
+  plan: "free",
+  features: FREE_FEATURES,
+  limits: { storeLimit: 1, channelLimit: 1, ordersPerMonth: 0, lookbackDays: 365 },
+  usage: FREE_USAGE,
+};
+
+export const ME = { user: USER, organizations: [ORG], entitlement: FREE_ENTITLEMENT };
 
 export const BILLING_FREE = {
   plan: "free",
@@ -18,7 +40,9 @@ export const BILLING_FREE = {
   trialEndsAt: null,
   currentPeriodEnd: null,
   cancelAtPeriodEnd: false,
-  usage: { stores: 0, storeLimit: 1 },
+  usage: FREE_USAGE,
+  features: FREE_FEATURES,
+  lookbackDays: 365,
   manageable: false,
 };
 

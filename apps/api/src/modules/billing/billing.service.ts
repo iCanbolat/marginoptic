@@ -6,19 +6,27 @@ import {
   Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
+import type { Redis } from "ioredis";
 import {
   ACTIVE_STATUSES,
   PLANS,
   TRIAL_DAYS,
+  withinLimit,
   type BillingState,
   type EffectivePlan,
+  type Feature,
+  type PlanEntitlement,
   type PlanId,
+  type SalesChannel,
   type SubscriptionStatus,
 } from "@churnify/shared";
 import { DRIZZLE, type DrizzleDB } from "../../database/database.module";
+import { REDIS } from "../../redis/redis.module";
 import { billingEvents, subscriptions } from "../../database/schema/billing";
 import { stores } from "../../database/schema/auth";
+import { channels } from "../../database/schema/channels";
+import { orders } from "../../database/schema/sales";
 import { CreemService } from "./creem.service";
 
 type SubRow = typeof subscriptions.$inferSelect;
@@ -28,7 +36,11 @@ export interface Entitlement {
   plan: EffectivePlan;
   status: SubscriptionStatus;
   active: boolean;
-  storeLimit: number;
+  storeLimit: number | null;
+  channelLimit: number | null;
+  ordersPerMonth: number | null;
+  lookbackDays: number;
+  features: Record<Feature, boolean>;
 }
 
 /** Creem durum string'i → bizim enum (bilinmeyen → active'e en yakın). */
@@ -49,6 +61,7 @@ export class BillingService {
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    @Inject(REDIS) private readonly redis: Redis,
     private readonly creem: CreemService,
     private readonly config: ConfigService,
   ) {}
@@ -74,19 +87,46 @@ export class BillingService {
   /** Hesabın efektif entitlement'ı (abonelik yoksa `free`). */
   async getEntitlement(userId: string): Promise<Entitlement> {
     const row = await this.getRow(userId);
-    if (!row || !ACTIVE_STATUSES.includes(row.status)) {
-      return {
-        plan: "free",
-        status: row?.status ?? "none",
-        active: false,
-        storeLimit: PLANS.free.storeLimit,
-      };
-    }
+    const active = Boolean(row && ACTIVE_STATUSES.includes(row.status));
+    const plan: EffectivePlan = active && row ? row.plan : "free";
+    const def = PLANS[plan];
     return {
-      plan: row.plan,
-      status: row.status,
-      active: true,
-      storeLimit: PLANS[row.plan].storeLimit,
+      plan,
+      status: row?.status ?? "none",
+      active,
+      storeLimit: def.storeLimit,
+      channelLimit: def.channelLimit,
+      ordersPerMonth: def.ordersPerMonth,
+      lookbackDays: def.lookbackDays,
+      features: def.features,
+    };
+  }
+
+  /** Geriye dönük sorgu için izin verilen gün sayısı (look-back clamp). */
+  async lookbackDays(userId: string): Promise<number> {
+    const ent = await this.getEntitlement(userId);
+    return ent.lookbackDays;
+  }
+
+  /** Mağaza (store) sahibinin look-back gün limiti — analitik clamp için. */
+  async lookbackDaysForStore(storeId: string): Promise<number> {
+    const ent = await this.entitlementForStore(storeId);
+    return ent?.lookbackDays ?? PLANS.free.lookbackDays;
+  }
+
+  /** `me()` ve frontend gating için entitlement özeti (plan + özellik + limit + kullanım). */
+  async entitlementSummary(userId: string): Promise<PlanEntitlement> {
+    const state = await this.getState(userId);
+    return {
+      plan: state.plan,
+      features: state.features,
+      limits: {
+        storeLimit: state.usage.storeLimit,
+        channelLimit: state.usage.channelLimit,
+        ordersPerMonth: state.usage.ordersPerMonth,
+        lookbackDays: state.lookbackDays,
+      },
+      usage: state.usage,
     };
   }
 
@@ -95,6 +135,10 @@ export class BillingService {
     const row = await this.getRow(userId);
     const ent = await this.getEntitlement(userId);
     const storesCount = await this.countStores(userId);
+    const channelsCount = await this.countChannelsForUser(userId);
+    const ordersThisMonth = await this.monthlyOrderUsage(userId);
+    const overLimit =
+      ent.ordersPerMonth !== null && ordersThisMonth >= ent.ordersPerMonth;
     return {
       plan: ent.plan,
       status: ent.status,
@@ -102,7 +146,17 @@ export class BillingService {
       trialEndsAt: row?.trialEndsAt?.toISOString() ?? null,
       currentPeriodEnd: row?.currentPeriodEnd?.toISOString() ?? null,
       cancelAtPeriodEnd: row?.cancelAtPeriodEnd ?? false,
-      usage: { stores: storesCount, storeLimit: ent.storeLimit },
+      usage: {
+        stores: storesCount,
+        storeLimit: ent.storeLimit,
+        channels: channelsCount,
+        channelLimit: ent.channelLimit,
+        ordersThisMonth,
+        ordersPerMonth: ent.ordersPerMonth,
+        overLimit,
+      },
+      features: ent.features,
+      lookbackDays: ent.lookbackDays,
       manageable: Boolean(row?.creemCustomerId),
     };
   }
@@ -114,12 +168,188 @@ export class BillingService {
   async assertCanAddStore(userId: string): Promise<void> {
     const ent = await this.getEntitlement(userId);
     const count = await this.countStores(userId);
-    if (count >= ent.storeLimit) {
+    if (!withinLimit(count, ent.storeLimit)) {
       throw new ForbiddenException(
         `Mağaza limitine ulaşıldı (${count}/${ent.storeLimit}). ` +
           `Daha fazla mağaza eklemek için planınızı yükseltin.`,
       );
     }
+  }
+
+  // ---- Kanal limiti ----
+
+  /** Bir mağazadaki bağlı kanal sayısı. */
+  private async countChannelsForStore(
+    db: DrizzleDB,
+    storeId: string,
+  ): Promise<number> {
+    const [row] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(channels)
+      .where(eq(channels.storeId, storeId));
+    return row?.n ?? 0;
+  }
+
+  /** Kullanıcının tüm mağazalarındaki toplam bağlı kanal sayısı. */
+  private async countChannelsForUser(userId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(channels)
+      .innerJoin(stores, eq(channels.storeId, stores.id))
+      .where(eq(stores.ownerUserId, userId));
+    return row?.n ?? 0;
+  }
+
+  /** Mağazanın sahibi (owner user id). */
+  private async ownerForStore(
+    db: DrizzleDB,
+    storeId: string,
+  ): Promise<string | null> {
+    const [row] = await db
+      .select({ ownerUserId: stores.ownerUserId })
+      .from(stores)
+      .where(eq(stores.id, storeId))
+      .limit(1);
+    return row?.ownerUserId ?? null;
+  }
+
+  /**
+   * Mağazaya yeni bir satış kanalı bağlanabilir mi? Plan kanal limiti aşılırsa 403.
+   * Var olan kanal tipinin yeniden bağlanması (reconnect) limit dışıdır.
+   * `db` verilirse (transaction) aynı tx üzerinde kontrol eder.
+   */
+  async assertCanAddChannel(
+    storeId: string,
+    channel: SalesChannel,
+    db: DrizzleDB = this.db,
+  ): Promise<void> {
+    // Var olan kanal tipi → reconnect; limit kontrolü yapma.
+    const [existing] = await db
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(eq(channels.storeId, storeId), eq(channels.channel, channel)))
+      .limit(1);
+    if (existing) return;
+
+    const ownerUserId = await this.ownerForStore(db, storeId);
+    if (!ownerUserId) return; // sahip çözülemedi → best-effort, engelleme
+    const ent = await this.getEntitlement(ownerUserId);
+    const count = await this.countChannelsForStore(db, storeId);
+    if (!withinLimit(count, ent.channelLimit)) {
+      throw new ForbiddenException(
+        `Kanal limitine ulaşıldı (${count}/${ent.channelLimit}). ` +
+          `Daha fazla satış kanalı bağlamak için planınızı Pro'ya yükseltin.`,
+      );
+    }
+  }
+
+  // ---- MCP entitlement ----
+
+  /** Bir mağazanın (api key sahibinin) entitlement'ı — MCP gating için. */
+  async entitlementForStore(storeId: string): Promise<Entitlement | null> {
+    const ownerUserId = await this.ownerForStore(this.db, storeId);
+    if (!ownerUserId) return null;
+    return this.getEntitlement(ownerUserId);
+  }
+
+  // ---- Aylık sipariş kullanımı (soft cap) ----
+
+  private currentMonthKey(d: Date = new Date()): string {
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  }
+
+  private orderUsageKey(userId: string, monthKey: string): string {
+    return `usage:orders:${userId}:${monthKey}`;
+  }
+
+  /** Kanalın sahibini (Redis cache'li) çözer. */
+  private async ownerForChannel(channelId: string): Promise<string | null> {
+    const cacheKey = `usage:chanowner:${channelId}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return cached;
+    const [row] = await this.db
+      .select({ ownerUserId: stores.ownerUserId })
+      .from(channels)
+      .innerJoin(stores, eq(channels.storeId, stores.id))
+      .where(eq(channels.id, channelId))
+      .limit(1);
+    const owner = row?.ownerUserId ?? null;
+    if (owner) await this.redis.set(cacheKey, owner, "EX", 60 * 60 * 24);
+    return owner;
+  }
+
+  /** İçinde bulunulan takvim ayında kullanıcının siparişlerini DB'den say (seed). */
+  private async dbMonthlyOrderCount(
+    userId: string,
+    monthKey: string,
+  ): Promise<number> {
+    const start = new Date(`${monthKey}-01T00:00:00.000Z`);
+    const end = new Date(start);
+    end.setUTCMonth(end.getUTCMonth() + 1);
+    const [row] = await this.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(orders)
+      .innerJoin(channels, eq(orders.channelId, channels.id))
+      .innerJoin(stores, eq(channels.storeId, stores.id))
+      .where(
+        and(
+          eq(stores.ownerUserId, userId),
+          gte(orders.processedAt, start),
+          lt(orders.processedAt, end),
+        ),
+      );
+    return row?.n ?? 0;
+  }
+
+  /** Aylık sipariş sayacını oku; yoksa DB'den seed eder (~40 gün TTL). */
+  async monthlyOrderUsage(userId: string): Promise<number> {
+    const monthKey = this.currentMonthKey();
+    const key = this.orderUsageKey(userId, monthKey);
+    const cached = await this.redis.get(key);
+    if (cached !== null) return Number(cached) || 0;
+    const seeded = await this.dbMonthlyOrderCount(userId, monthKey);
+    await this.redis.set(key, String(seeded), "EX", 60 * 60 * 24 * 40);
+    return seeded;
+  }
+
+  /**
+   * Yeni bir sipariş ingest edildiğinde (yalnız insert) aylık sayacı artırır.
+   * **Soft cap**: asla engellemez, yalnız sayacı korur; hata olsa bile yutar
+   * (kullanım takibi sipariş yazımını bozmamalı). Transaction commit'inden
+   * SONRA çağrılmalıdır (sayaç seed'i commit edilen satırı görür).
+   */
+  async recordOrderIngested(channelId: string): Promise<void> {
+    try {
+      const userId = await this.ownerForChannel(channelId);
+      if (!userId) return;
+      const monthKey = this.currentMonthKey();
+      const key = this.orderUsageKey(userId, monthKey);
+      const exists = await this.redis.exists(key);
+      if (exists) {
+        await this.redis.incr(key);
+      } else {
+        // İlk yazım: DB sayımı zaten bu (commit edilmiş) order'ı içerir → INCR'a gerek yok.
+        const seeded = await this.dbMonthlyOrderCount(userId, monthKey);
+        await this.redis.set(key, String(seeded), "EX", 60 * 60 * 24 * 40);
+      }
+    } catch (err) {
+      this.logger.warn(`Sipariş kullanım sayacı güncellenemedi: ${String(err)}`);
+    }
+  }
+
+  /** Aylık sipariş limiti aşıldı mı (soft brake için). */
+  async isOverOrderLimit(userId: string): Promise<boolean> {
+    const ent = await this.getEntitlement(userId);
+    if (ent.ordersPerMonth === null) return false;
+    const used = await this.monthlyOrderUsage(userId);
+    return used >= ent.ordersPerMonth;
+  }
+
+  /** Bir kanal sahibinin aylık sipariş limiti aşıldı mı (backfill soft-brake). */
+  async isOverOrderLimitForChannel(channelId: string): Promise<boolean> {
+    const userId = await this.ownerForChannel(channelId);
+    if (!userId) return false;
+    return this.isOverOrderLimit(userId);
   }
 
   /** Hosted checkout başlat (canlı). Dev modda dev-activate kullanılmalı. */

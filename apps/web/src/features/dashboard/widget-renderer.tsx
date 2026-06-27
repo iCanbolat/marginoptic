@@ -1,4 +1,5 @@
 import type { DashboardWidget } from "@churnify/shared";
+import { ProFeature, LockedWidget } from "@/components/plan/pro-feature";
 import { toParams, type DashFilter } from "./use-analytics";
 import { KpiWidget } from "./widgets/kpi-widget";
 import { TimeseriesWidget } from "./widgets/timeseries-widget";
@@ -34,19 +35,31 @@ export function WidgetRenderer({
     case "pnl":
       return <PnlWidget filter={filter} />;
     case "products":
-      // Ürün satırlarında trend için önceki dönemi her zaman getir.
+      // Ürün kârlılığı Pro'ya özel: Basic'te veri yerine kilitli durum gösterilir.
       return (
-        <ProductsWidget
-          config={widget.config}
-          filter={{ ...filter, compare: true }}
-        />
+        <ProFeature
+          feature="productProfitability"
+          fallback={<LockedWidget feature="productProfitability" />}
+        >
+          <ProductsWidget
+            config={widget.config}
+            filter={{ ...filter, compare: true }}
+          />
+        </ProFeature>
       );
     case "cost_breakdown":
       return <CostBreakdownWidget filter={filter} />;
     case "channel":
       return <ChannelWidget filter={filter} />;
     case "custom_metric":
-      return <CustomMetricWidget config={widget.config} filter={filter} />;
+      return (
+        <ProFeature
+          feature="customMetrics"
+          fallback={<LockedWidget feature="customMetrics" />}
+        >
+          <CustomMetricWidget config={widget.config} filter={filter} />
+        </ProFeature>
+      );
     default:
       return null;
   }

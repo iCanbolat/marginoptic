@@ -159,12 +159,15 @@ export function BillingPage() {
                   <span className="text-2xl font-semibold text-foreground">
                     {plan.priceLabel}
                   </span>{" "}
-                  · {plan.storeLimit} mağazaya kadar
+                  ·{" "}
+                  {plan.storeLimit === null
+                    ? "Sınırsız mağaza"
+                    : `${plan.storeLimit} mağazaya kadar`}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <ul className="space-y-2 text-sm">
-                  {plan.features.map((f) => (
+                  {plan.featureLabels.map((f) => (
                     <li key={f} className="flex items-start gap-2">
                       <HugeiconsIcon
                         icon={Tick02Icon}
@@ -225,9 +228,8 @@ function CurrentPlanCard({
   const plan = PLANS[state.plan];
   const daysLeft =
     state.status === "trialing" ? trialDaysLeft(state.trialEndsAt) : null;
-  const { stores, storeLimit } = state.usage;
-  const atLimit = stores >= storeLimit;
-  const usagePct = Math.min(100, Math.round((stores / storeLimit) * 100));
+  const { stores, storeLimit, channels, channelLimit, ordersThisMonth, ordersPerMonth, overLimit } =
+    state.usage;
 
   return (
     <Card>
@@ -276,31 +278,68 @@ function CurrentPlanCard({
           </div>
         )}
 
-        {/* Mağaza kullanımı */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Mağaza kullanımı</span>
-            <span className="font-medium">
-              {stores} / {storeLimit}
+        {/* Kullanım göstergeleri */}
+        <UsageMeter label="Mağaza kullanımı" used={stores} limit={storeLimit} />
+        <UsageMeter label="Kanal kullanımı" used={channels} limit={channelLimit} />
+        <UsageMeter
+          label="Aylık sipariş"
+          used={ordersThisMonth}
+          limit={ordersPerMonth}
+        />
+
+        {overLimit && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            <HugeiconsIcon
+              icon={Alert02Icon}
+              strokeWidth={2}
+              className="mt-0.5 size-4 shrink-0"
+            />
+            <span>
+              Aylık sipariş limitinize ulaştınız. Mevcut verileriniz korunur, ancak
+              yeni geçmiş içe-aktarımlar bu ay duraklatıldı. Daha fazlası için
+              planınızı yükseltin.
             </span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all",
-                atLimit ? "bg-amber-500" : "bg-primary",
-              )}
-              style={{ width: `${usagePct}%` }}
-            />
-          </div>
-          {atLimit && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              Mağaza limitine ulaştınız. Daha fazla mağaza bağlamak için planınızı
-              yükseltin.
-            </p>
-          )}
-        </div>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Tek bir kullanım çubuğu; `limit === null` ise sınırsız (çubuk gizlenir). */
+function UsageMeter({
+  label,
+  used,
+  limit,
+}: {
+  label: string;
+  used: number;
+  limit: number | null;
+}) {
+  const unlimited = limit === null;
+  const atLimit = !unlimited && used >= limit;
+  const pct = unlimited
+    ? 0
+    : Math.min(100, Math.round((used / Math.max(1, limit)) * 100));
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium">
+          {used} / {unlimited ? "Sınırsız" : limit}
+        </span>
+      </div>
+      {!unlimited && (
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all",
+              atLimit ? "bg-amber-500" : "bg-primary",
+            )}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+    </div>
   );
 }

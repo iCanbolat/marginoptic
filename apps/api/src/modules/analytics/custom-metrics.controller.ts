@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
@@ -21,19 +22,30 @@ import {
   type CustomMetricValuesResponse,
 } from "@churnify/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
+import { RequiresFeature } from "../auth/decorators/requires-feature.decorator";
 import {
   type ActiveStore,
   CurrentStore,
 } from "../auth/decorators/current-store.decorator";
+import { RequiresFeatureGuard } from "../auth/guards/requires-feature.guard";
+import { BillingService } from "../billing/billing.service";
 import { CustomMetricsService } from "./custom-metrics.service";
+import { clampFromToLookback } from "./lookback.util";
 
-const EDIT_ROLES = ["owner", "admin", "analyst"] as const;
-
+/**
+ * Özel metrikler — Pro plana özel (`@RequiresFeature("customMetrics")`).
+ * Tüm uçlar plan özellik haritasına göre korunur.
+ */
 @ApiTags("custom-metrics")
 @ApiBearerAuth()
+@UseGuards(RequiresFeatureGuard)
+@RequiresFeature("customMetrics")
 @Controller("custom-metrics")
 export class CustomMetricsController {
-  constructor(private readonly metrics: CustomMetricsService) {}
+  constructor(
+    private readonly metrics: CustomMetricsService,
+    private readonly billing: BillingService,
+  ) {}
 
   @Get()
   list(@CurrentStore() org: ActiveStore): Promise<CustomMetricSummary[]> {
@@ -42,12 +54,16 @@ export class CustomMetricsController {
 
   /** Org özel metriklerini verilen aralık/mağazalar için değerlendirir. */
   @Get("values")
-  values(
+  async values(
     @CurrentStore() org: ActiveStore,
     @Query(new ZodValidationPipe(analyticsFilterSchema))
     filter: AnalyticsFilter,
   ): Promise<CustomMetricValuesResponse> {
-    return this.metrics.values(org.id, filter);
+    const days = await this.billing.lookbackDaysForStore(org.id);
+    return this.metrics.values(org.id, {
+      ...filter,
+      from: clampFromToLookback(filter.from, days),
+    });
   }
 
   @Post()

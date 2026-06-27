@@ -213,7 +213,11 @@
       "Bash(curl -s http://localhost:3001)",
       "Bash(curl -s -o /dev/null -w \"homepage HTTP %{http_code}\\\\n\" http://localhost:3001)",
       "Bash(pkill -f \"next dev -p 3001\")",
-      "Bash(curl -s -o /dev/null http://localhost:3001)"
+      "Bash(curl -s -o /dev/null http://localhost:3001)",
+      "Bash(echo \"exit: $? \\(no output = no risky imports\\)\")",
+      "Bash(echo \"tsc exit: $?\")",
+      "Bash(echo \"web tsc exit: $?\")",
+      "Bash(echo \"landing tsc exit: $?\")"
     ],
     "additionalDirectories": [
       "/tmp",

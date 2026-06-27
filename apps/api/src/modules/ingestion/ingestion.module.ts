@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { BillingModule } from "../billing/billing.module";
 import { EbayConnector } from "../integrations/ebay/ebay.connector";
 import { AmazonConnector } from "../integrations/amazon/amazon.connector";
 import { IngestionController } from "./ingestion.controller";
@@ -18,6 +19,7 @@ import { ShopifyGraphqlClient } from "./shopify/shopify-graphql.client";
  * işleme + okuma sorguları. Sync kuyruğu (processor'lar) ve Integrations bu modülü kullanır.
  */
 @Module({
+  imports: [BillingModule],
   controllers: [IngestionController],
   providers: [
     IngestionService,

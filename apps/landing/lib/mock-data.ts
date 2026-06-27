@@ -189,8 +189,10 @@ export const PLANS: Plan[] = [
       "1 store, up to 2 sales channels",
       "Real net-profit dashboard",
       "COGS, shipping & fee tracking",
-      "Daily data sync",
+      "Ad attribution (Meta, Google, TikTok)",
+      "1 year data look-back",
       "Email support",
+      "50 orders / month",
     ],
   },
   {
@@ -202,11 +204,12 @@ export const PLANS: Plan[] = [
     cta: "Start free trial",
     features: [
       "Unlimited stores & channels",
-      "Ad attribution (Meta, Google, TikTok)",
       "Product & campaign profitability",
       "Custom metrics & widgets",
       "AI analysis via MCP",
+      "2 year data look-back",
       "Priority support",
+      "3,000 orders / month",
     ],
   },
 ];

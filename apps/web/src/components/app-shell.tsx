@@ -151,15 +151,17 @@ export function AppShell() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const setStores = useAuthStore((s) => s.setStores);
+  const setEntitlement = useAuthStore((s) => s.setEntitlement);
   const collapsed = useSidebar((s) => s.collapsed);
   const toggleSidebar = useSidebar((s) => s.toggle);
 
-  // Mağaza listesini + kullanıcıyı tazele (switcher bunu kullanır).
+  // Mağaza listesini + kullanıcıyı + plan entitlement'ını tazele (switcher + gating bunu kullanır).
   useQuery({
     queryKey: ["me"],
     queryFn: async () => {
       const me = await authApi.me();
       setStores(me.stores);
+      setEntitlement(me.entitlement);
       return me;
     },
   });

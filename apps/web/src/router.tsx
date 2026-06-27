@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from "@/lib/auth/store";
 import { authApi } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
+import { ProFeature } from "@/components/plan/pro-feature";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { LoginPage } from "@/features/auth/login-page";
 import { RegisterPage } from "@/features/auth/register-page";
@@ -57,7 +58,11 @@ const ordersRoute = createRoute({
 const productsRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/products",
-  component: ProductsPage,
+  component: () => (
+    <ProFeature feature="productProfitability">
+      <ProductsPage />
+    </ProFeature>
+  ),
 });
 
 const costsRoute = createRoute({
@@ -69,7 +74,11 @@ const costsRoute = createRoute({
 const adsRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/ads",
-  component: AdsPage,
+  component: () => (
+    <ProFeature feature="campaignProfitability">
+      <AdsPage />
+    </ProFeature>
+  ),
 });
 
 const storesRoute = createRoute({
@@ -81,7 +90,11 @@ const storesRoute = createRoute({
 const apiKeysRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/settings/api-keys",
-  component: ApiKeysPage,
+  component: () => (
+    <ProFeature feature="mcp">
+      <ApiKeysPage />
+    </ProFeature>
+  ),
 });
 
 const billingRoute = createRoute({

@@ -13,6 +13,7 @@ import type {
   WidgetType,
 } from "@churnify/shared";
 import { dashboardsApi } from "@/lib/api";
+import { useFeature } from "@/lib/auth/use-plan";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -64,6 +65,7 @@ function starterWidgets(): DashboardWidget[] {
 export function DashboardPage() {
   const qc = useQueryClient();
   const canEdit = true;
+  const canCustomMetrics = useFeature("customMetrics");
 
   const [range, setRange] = useState<DateRangeValue>({
     from: daysAgoIso(29),
@@ -199,7 +201,7 @@ export function DashboardPage() {
           <StoreFilter value={storeIds} onChange={setStoreIds} />
         </div>
         <div className="flex items-center gap-2">
-          <CustomMetricsDialog canEdit={canEdit} />
+          {canCustomMetrics && <CustomMetricsDialog canEdit={canEdit} />}
           {canEdit && dashboards.length > 0 && (
             editing ? (
               <div

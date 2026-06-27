@@ -29,6 +29,7 @@ import {
 } from "../../database/schema/channels";
 import { AdConnectorRegistry } from "./ads/ad-connector.registry";
 import { AdsSyncService } from "../ads/ads-sync.service";
+import { BillingService } from "../billing/billing.service";
 import { SyncService } from "../sync/sync.service";
 import { ProductTrafficService } from "../tracking/product-traffic.service";
 import { ConnectorRegistry } from "./connector.registry";
@@ -76,6 +77,7 @@ export class IntegrationsService {
     private readonly adRegistry: AdConnectorRegistry,
     private readonly adsSync: AdsSyncService,
     private readonly sync: SyncService,
+    private readonly billing: BillingService,
     private readonly traffic: ProductTrafficService,
     private readonly ebay: EbayConnector,
     private readonly amazon: AmazonConnector,
@@ -717,6 +719,9 @@ export class IntegrationsService {
     tokens: TokenSet,
   ): Promise<{ channelId: string; connectionId: string }> {
     return this.db.transaction(async (tx) => {
+      // Plan kanal limiti: yeni bir satış kanalı tipi limitten fazlaysa 403
+      // (mevcut kanalın reconnect'i limit dışıdır). Aynı tx üzerinde kontrol edilir.
+      await this.billing.assertCanAddChannel(storeId, channel, tx);
       // Store başına kanal-tekilliği: aynı kanal yeniden bağlanırsa üzerine yazılır.
       const [store] = await tx
         .insert(channels)
