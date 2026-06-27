@@ -37,12 +37,6 @@ function KpiCard({
   );
 }
 
-/** LTV:CAC oranını "2.05 : 1" biçiminde döndürür; geçersizse tire. */
-function ratioLabel(ltv: number, cac: number | null): string {
-  if (cac == null || cac <= 0 || !Number.isFinite(ltv)) return DASH;
-  return `${(ltv / cac).toFixed(2)} : 1`;
-}
-
 /** KPI bazında seçilen döneme göre yüzde değişim; compare kapalıysa boş. */
 export interface CustomerKpiDeltas {
   customers: number | null;
@@ -68,7 +62,7 @@ export function CustomerAnalyticsKpis({
   const cacValue = cac?.cac != null ? Number(cac.cac) : null;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-4">
       <KpiCard
         label="Total Customers"
         isLoading={isLoading}
@@ -94,12 +88,7 @@ export function CustomerAnalyticsKpis({
         delta={deltas?.cac}
         lowerIsBetter
       />
-      <KpiCard
-        label="LTV:CAC Ratio"
-        isLoading={isLoading}
-        value={ltvValue != null ? ratioLabel(ltvValue, cacValue) : DASH}
-        delta={deltas?.ltvCacRatio}
-      />
+    
     </div>
   );
 }

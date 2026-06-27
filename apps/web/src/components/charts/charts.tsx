@@ -188,7 +188,9 @@ export interface DonutChartProps {
   className?: string;
 }
 
-/** Tema uyumlu donut (maliyet kırılımı: COGS/kargo/ücret/reklam/gider payları). */
+/** Tema uyumlu donut (maliyet kırılımı: COGS/kargo/ücret/reklam/gider payları).
+   Lejant donut'un sağında dikey listelenir (altta değil) → dar widget'larda
+   yatay alanı verimli kullanır. */
 export function DonutChart({
   data,
   kind = "currency",
@@ -198,43 +200,65 @@ export function DonutChart({
 }: DonutChartProps) {
   const fmt = resolveFormatters(kind, currency);
   const filtered = data.filter((d) => d.value > 0);
+  const total = filtered.reduce((sum, d) => sum + d.value, 0);
   return (
-    <div className={cn("w-full", className)} style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <RPieChart>
-          <Pie
-            data={filtered}
-            dataKey="value"
-            nameKey="name"
-            innerRadius="55%"
-            outerRadius="80%"
-            paddingAngle={2}
-            stroke="var(--background)"
-            strokeWidth={2}
-          >
-            {filtered.map((d, i) => (
-              <Cell key={d.name} fill={d.color ?? seriesColor(i)} />
-            ))}
-          </Pie>
-          <Tooltip
-            content={({ active, payload }) => {
-              if (!active || !payload || payload.length === 0) return null;
-              const p = payload[0];
-              return (
-                <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-md">
-                  <div className="font-medium text-popover-foreground">
-                    {p.name}
+    <div
+      className={cn("flex w-full items-center gap-4", className)}
+      style={{ height }}
+    >
+      <div className="h-full min-w-0 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <RPieChart>
+            <Pie
+              data={filtered}
+              dataKey="value"
+              nameKey="name"
+              innerRadius="55%"
+              outerRadius="80%"
+              paddingAngle={2}
+              stroke="var(--background)"
+              strokeWidth={2}
+            >
+              {filtered.map((d, i) => (
+                <Cell key={d.name} fill={d.color ?? seriesColor(i)} />
+              ))}
+            </Pie>
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload || payload.length === 0) return null;
+                const p = payload[0];
+                return (
+                  <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-md">
+                    <div className="font-medium text-popover-foreground">
+                      {p.name}
+                    </div>
+                    <div className="tabular-nums text-muted-foreground">
+                      {fmt.full(Number(p.value))}
+                    </div>
                   </div>
-                  <div className="tabular-nums text-muted-foreground">
-                    {fmt.full(Number(p.value))}
-                  </div>
-                </div>
-              );
-            }}
-          />
-          <Legend wrapperStyle={LEGEND_STYLE} />
-        </RPieChart>
-      </ResponsiveContainer>
+                );
+              }}
+            />
+          </RPieChart>
+        </ResponsiveContainer>
+      </div>
+      <ul className="flex max-h-full min-w-0 flex-1 flex-col justify-center gap-1.5 overflow-auto py-1 text-xs">
+        {filtered.map((d, i) => {
+          const pct = total > 0 ? (d.value / total) * 100 : 0;
+          return (
+            <li key={d.name} className="flex items-center gap-2">
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ background: d.color ?? seriesColor(i) }}
+              />
+              <span className="truncate text-foreground">{d.name}</span>
+              <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
+                %{pct.toFixed(0)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

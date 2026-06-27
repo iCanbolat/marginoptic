@@ -3,6 +3,7 @@ import { useSortable } from "@dnd-kit/react/sortable";
 import { move } from "@dnd-kit/helpers";
 import "./grid.css";
 import type { DashboardWidget } from "@churnify/shared";
+import { cn } from "@/lib/utils";
 import { WidgetFrame } from "./widget-frame";
 import { WidgetRenderer } from "./widget-renderer";
 import type { DashFilter } from "./use-analytics";
@@ -76,7 +77,12 @@ function SortableWidget({
   return (
     <div
       ref={ref}
-      className="dash-grid-item"
+      // w≥4 "geniş" widget'lar dar ekranlarda satırı tam kaplar (boşluk kalmaz);
+      // w:3 KPI'lar tablet ızgarasında 2'li dizilerek satırı doldurur.
+      className={cn(
+        "dash-grid-item",
+        widget.layout.w >= 4 && "dash-grid-item--wide",
+      )}
       style={{
         gridColumn: `span ${widget.layout.w}`,
         gridRow: `span ${widget.layout.h}`,

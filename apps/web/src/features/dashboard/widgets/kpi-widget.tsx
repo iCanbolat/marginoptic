@@ -45,14 +45,20 @@ export function KpiWidget({
   }
 
   return (
-    <div className="flex h-full flex-col justify-center gap-1.5">
-      <div className="truncate text-3xl font-semibold tabular-nums">
+    <div className="flex h-full min-w-0 flex-col justify-center gap-1.5">
+      <div className="truncate text-2xl leading-tight font-semibold tabular-nums sm:text-3xl">
         {formatMetric(value, meta.kind, currency)}
       </div>
       {delta != null && (
-        <div className="flex items-center gap-1.5 text-xs">
-          <TrendBadge delta={delta} lowerIsBetter={LOWER_IS_BETTER.has(metricKey)} />
-          <span className="text-muted-foreground">önceki döneme göre</span>
+        <div className="flex min-w-0 items-center gap-1.5 text-xs">
+          <TrendBadge
+            delta={delta}
+            lowerIsBetter={LOWER_IS_BETTER.has(metricKey)}
+            className="shrink-0"
+          />
+          <span className="truncate text-muted-foreground">
+            önceki döneme göre
+          </span>
         </div>
       )}
     </div>

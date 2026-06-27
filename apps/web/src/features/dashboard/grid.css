@@ -15,9 +15,29 @@
   min-height: 0;
 }
 
-/* Dar ekranlarda 2 kolona düş (span'ler otomatik kırpılır). */
+/* Tablet: 6 kolona düş → KPI'lar (w:3) 2'li dizilir; geniş (w≥4) widget'lar
+   satırı tam kaplar → 6'ya tam bölünmeyen span'lerden doğan boşluk oluşmaz. */
+@media (max-width: 1024px) {
+  .dash-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .dash-grid-item--wide {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+/* Telefon: tek kolon + içeriğe göre yükseklik → her kart tam genişlik kaplar,
+   sabit satır yüksekliği içeriği kırpmaz (boşluk/kesik görüntü oluşmaz). */
 @media (max-width: 640px) {
   .dash-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+
+  .dash-grid-item {
+    /* Inline span'leri ez: tek kolon, içeriğe göre satır. */
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
   }
 }
