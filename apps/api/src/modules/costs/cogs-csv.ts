@@ -121,29 +121,31 @@ export function parseCogsCsv(csv: string): ParseCogsCsvResult {
     let handlingFee: string | null = null;
     let minQty = 1;
 
+    // Hata mesajları "{satır}. satırdaki {mesaj}" olarak okunacak şekilde,
+    // küçük harfle başlayan açıklayıcı ifadeler olarak tutulur.
     if (!sku) {
-      error = "sku boş";
+      error = "sku değeri boş olamaz";
     } else {
       costAmount = normalizeMoney(costRaw);
       if (costAmount == null) {
-        error = `geçersiz cost: "${costRaw}"`;
+        error = "maliyet değeri bir sayı olmalıdır";
       } else if (handlingRaw) {
         handlingFee = normalizeMoney(handlingRaw);
-        if (handlingFee == null) error = `geçersiz handling: "${handlingRaw}"`;
+        if (handlingFee == null) error = "işleme ücreti bir sayı olmalıdır";
       }
       if (!error && minQtyRaw) {
         const q = Number(minQtyRaw);
         if (!Number.isInteger(q) || q < 1) {
-          error = `geçersiz min_qty: "${minQtyRaw}"`;
+          error = "minimum adet pozitif bir tam sayı olmalıdır";
         } else {
           minQty = q;
         }
       }
       if (!error && currency && !/^[A-Z]{3}$/.test(currency)) {
-        error = `geçersiz currency: "${currency}"`;
+        error = "para birimi 3 harfli olmalıdır (örn. USD)";
       }
       if (!error && country && !/^[A-Z]{2}$/.test(country)) {
-        error = `geçersiz country: "${country}"`;
+        error = "ülke kodu 2 harfli olmalıdır (örn. TR)";
       }
     }
 

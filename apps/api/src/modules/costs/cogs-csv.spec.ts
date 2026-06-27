@@ -50,8 +50,11 @@ describe("parseCogsCsv", () => {
     );
     expect(rows[0]).toMatchObject({ sku: "GOOD", valid: true });
     expect(rows[1]).toMatchObject({ sku: "BAD", valid: false });
-    expect(rows[1]!.error).toMatch(/cost/);
-    expect(rows[2]).toMatchObject({ valid: false, error: "sku boş" });
+    expect(rows[1]!.error).toMatch(/maliyet/);
+    expect(rows[2]).toMatchObject({
+      valid: false,
+      error: "sku değeri boş olamaz",
+    });
     expect(rows[3]).toMatchObject({ sku: "QTY", valid: true });
   });
 

@@ -217,7 +217,11 @@
       "Bash(echo \"exit: $? \\(no output = no risky imports\\)\")",
       "Bash(echo \"tsc exit: $?\")",
       "Bash(echo \"web tsc exit: $?\")",
-      "Bash(echo \"landing tsc exit: $?\")"
+      "Bash(echo \"landing tsc exit: $?\")",
+      "Bash(pnpm --filter @churnify/api test cogs-csv)",
+      "Bash(pnpm --filter @churnify/web exec eslint src/features/costs/components/cogs-csv-import.tsx)",
+      "Bash(npx --no-install eslint apps/web/src/features/costs/components/cogs-csv-import.tsx)",
+      "Bash(echo \"exit: $?\")"
     ],
     "additionalDirectories": [
       "/tmp",

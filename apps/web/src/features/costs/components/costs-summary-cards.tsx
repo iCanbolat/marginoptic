@@ -48,7 +48,7 @@ function SummaryCard({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "group flex flex-col gap-3 rounded-none border bg-card p-4 text-left ring-1 ring-transparent transition-colors hover:border-foreground/20",
+        "group flex flex-col gap-3 rounded-none cursor-pointer border bg-card p-4 text-left ring-1 ring-transparent transition-colors hover:border-foreground/20",
         active
           ? "border-primary/40 ring-primary/30"
           : "border-border/60 ring-transparent",
