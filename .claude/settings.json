@@ -221,7 +221,9 @@
       "Bash(pnpm --filter @churnify/api test cogs-csv)",
       "Bash(pnpm --filter @churnify/web exec eslint src/features/costs/components/cogs-csv-import.tsx)",
       "Bash(npx --no-install eslint apps/web/src/features/costs/components/cogs-csv-import.tsx)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(pnpm --filter @churnify/api test -- ad-connectors)",
+      "Bash(pnpm --filter @churnify/api lint)"
     ],
     "additionalDirectories": [
       "/tmp",

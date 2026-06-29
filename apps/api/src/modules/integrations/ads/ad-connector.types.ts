@@ -17,6 +17,8 @@ export interface AdInsightsParams {
   externalAccountId: string;
   since: string; // YYYY-MM-DD
   until: string; // YYYY-MM-DD
+  /** Bağlantı-anı bilgileri (Amazon region, Google login-customer-id vb.). */
+  metadata?: Record<string, unknown>;
 }
 
 /** Normalize edilmiş reklam varlığı (hiyerarşi düğümü). */

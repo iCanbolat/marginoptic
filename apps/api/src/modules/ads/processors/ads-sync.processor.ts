@@ -70,6 +70,9 @@ export class AdsSyncProcessor
       .select({
         status: integrationConnections.status,
         accessTokenEnc: integrationConnections.accessTokenEnc,
+        refreshTokenEnc: integrationConnections.refreshTokenEnc,
+        tokenExpiresAt: integrationConnections.tokenExpiresAt,
+        metadata: integrationConnections.metadata,
         channelId: integrationConnections.channelId,
         provider: integrationConnections.provider,
         externalAccountId: integrationConnections.externalAccountId,
@@ -97,13 +100,24 @@ export class AdsSyncProcessor
     try {
       const accessToken = this.crypto.decrypt(conn.accessTokenEnc);
       const isDev = accessToken.startsWith("dev_");
+      // Canlı yol: kısa ömürlü access token'ı (Amazon/Google/eBay) gerekiyorsa yenile.
+      const liveToken = isDev
+        ? accessToken
+        : await this.ensureFreshToken(
+            connectionId,
+            prov,
+            accessToken,
+            conn.refreshTokenEnc,
+            conn.tokenExpiresAt,
+          );
       const result = isDev
         ? generateSyntheticAds(account)
         : await this.registry.get(prov).fetchInsights({
-            accessToken,
+            accessToken: liveToken,
             externalAccountId: account,
             since: since ?? "",
             until: until ?? "",
+            metadata: (conn.metadata as Record<string, unknown>) ?? undefined,
           });
 
       // Dev + ürün-raporlu sağlayıcı: gerçek ürün dış kimlikleri üzerinden
@@ -141,6 +155,43 @@ export class AdsSyncProcessor
       });
       throw err;
     }
+  }
+
+  /**
+   * Kısa ömürlü access token'ı yeniler (Amazon/Google/eBay ~1-2s). Son kullanma
+   * ~5 dk içindeyse ve connector `refreshToken` destekliyorsa refresh token'la
+   * yeniler, yeni token'ları (access/refresh/expiry) bağlantıya yazar ve taze
+   * access token'ı döner. Aksi halde mevcut token'ı (Meta/TikTok uzun ömürlü) döner.
+   */
+  private async ensureFreshToken(
+    connectionId: string,
+    provider: AdProvider,
+    accessToken: string,
+    refreshTokenEnc: string | null,
+    tokenExpiresAt: Date | null,
+  ): Promise<string> {
+    const connector = this.registry.get(provider);
+    const needsRefresh =
+      !!tokenExpiresAt &&
+      tokenExpiresAt.getTime() - Date.now() < 5 * 60_000;
+    if (!needsRefresh || !connector.refreshToken || !refreshTokenEnc) {
+      return accessToken;
+    }
+    const tokens = await connector.refreshToken(
+      this.crypto.decrypt(refreshTokenEnc),
+    );
+    await this.db
+      .update(integrationConnections)
+      .set({
+        accessTokenEnc: this.crypto.encrypt(tokens.accessToken),
+        refreshTokenEnc: tokens.refreshToken
+          ? this.crypto.encrypt(tokens.refreshToken)
+          : refreshTokenEnc,
+        tokenExpiresAt: tokens.expiresAt ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(integrationConnections.id, connectionId));
+    return tokens.accessToken;
   }
 
   /**
